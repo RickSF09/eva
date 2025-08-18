@@ -1,5 +1,9 @@
 'use client'
 
+// Disable static generation to avoid pre-render errors with useSearchParams
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
