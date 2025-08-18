@@ -20,13 +20,18 @@ import {
 import { format, parseISO, startOfWeek } from 'date-fns'
 
 interface PageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 export default function ElderDetailPage({ params }: PageProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const elderId = params.id
+  const [elderId, setElderId] = useState<string>('')
+
+  // Unwrap params Promise in Next.js 15
+  useEffect(() => {
+    params.then(({ id }) => setElderId(id))
+  }, [params])
 
   const [elder, setElder] = useState<any>(null)
   const [reports, setReports] = useState<any[]>([])
@@ -39,9 +44,11 @@ export default function ElderDetailPage({ params }: PageProps) {
   const [analysis, setAnalysis] = useState<any | null>(null)
 
   useEffect(() => {
-    fetchElder()
-    fetchReports()
-    fetchAnalysis()
+    if (elderId) {
+      fetchElder()
+      fetchReports()
+      fetchAnalysis()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [elderId])
 
