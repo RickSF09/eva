@@ -15,23 +15,33 @@ interface Invitation {
   expires_at: string | null
 }
 
-export default function AcceptInvitePage({ params }: { params: { token: string } }) {
+// Update to Next.js 15 async params
+interface PageProps {
+  params: Promise<{ token: string }>
+}
+
+export default function AcceptInvitePage({ params }: PageProps) {
   const { user, loading: authLoading } = useAuth()
   const router = useRouter()
   const [invite, setInvite] = useState<Invitation | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [token, setToken] = useState<string>('')
 
   useEffect(() => {
-    if (!params?.token) return
+    params.then(({ token }) => setToken(token))
+  }, [params])
+
+  useEffect(() => {
+    if (!token) return
     if (!user) {
       setLoading(false)
       return
     }
     fetchInvite()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params?.token, user?.id])
+  }, [token, user?.id])
 
   const fetchInvite = async () => {
     try {
@@ -41,7 +51,7 @@ export default function AcceptInvitePage({ params }: { params: { token: string }
       const { data, error } = await supabase
         .from('organization_invitations')
         .select('id, org_id, email, role, status, token, expires_at')
-        .eq('token', params.token)
+        .eq('token', token)
         .single()
 
       if (error) throw error
