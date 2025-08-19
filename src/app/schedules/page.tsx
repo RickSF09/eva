@@ -7,7 +7,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { ScheduleForm } from '@/components/schedules/ScheduleForm'
 import { ScheduleAssignment } from '@/components/schedules/ScheduleAssignment'
 import { supabase } from '@/lib/supabase'
-import { Plus, Calendar, ChevronDown, ChevronUp, Users } from 'lucide-react'
+import { Plus, Calendar, ChevronDown, ChevronUp, Users, Trash2 } from 'lucide-react'
 
 interface Elder {
   id: string
@@ -147,8 +147,10 @@ export default function SchedulesPage() {
   const [schedules, setSchedules] = useState<ScheduleWithAssignments[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
   const [selectedSchedule, setSelectedSchedule] = useState<any>(null)
   const [showAssignmentModal, setShowAssignmentModal] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   useEffect(() => {
     if (currentOrg) {
@@ -180,8 +182,10 @@ export default function SchedulesPage() {
     }
   }
 
-  const handleScheduleAdded = () => {
+  const handleScheduleSaved = () => {
     setShowAddForm(false)
+    setShowEditForm(false)
+    setSelectedSchedule(null)
     fetchSchedules()
   }
 
@@ -194,6 +198,46 @@ export default function SchedulesPage() {
   const openAssignmentModal = (schedule: any) => {
     setSelectedSchedule(schedule)
     setShowAssignmentModal(true)
+  }
+
+  const openEditForm = (schedule: any) => {
+    setSelectedSchedule(schedule)
+    setShowEditForm(true)
+  }
+
+  const handleDeleteSchedule = async (scheduleId: string) => {
+    const confirmed = window.confirm('Delete this schedule? Assigned clients will no longer receive calls for it.')
+    if (!confirmed) return
+
+    setDeletingId(scheduleId)
+    try {
+      // Try hard delete first
+      const { error: deleteError } = await supabase
+        .from('call_schedules')
+        .delete()
+        .eq('id', scheduleId)
+
+      if (deleteError) {
+        // Fallback: soft delete by deactivating
+        const { error: updateError } = await supabase
+          .from('call_schedules')
+          .update({ active: false, updated_at: new Date().toISOString() })
+          .eq('id', scheduleId)
+
+        if (updateError) {
+          console.error('Error deleting schedule:', deleteError, updateError)
+          alert('Failed to delete schedule')
+          return
+        }
+      }
+
+      fetchSchedules()
+    } catch (err) {
+      console.error('Unexpected error deleting schedule:', err)
+      alert('Failed to delete schedule')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
@@ -213,11 +257,16 @@ export default function SchedulesPage() {
           </button>
         </div>
 
-        {showAddForm && (
+        {(showAddForm || showEditForm) && (
           <div className="mb-8">
             <ScheduleForm
-              onSave={handleScheduleAdded}
-              onCancel={() => setShowAddForm(false)}
+              schedule={showEditForm ? selectedSchedule : undefined}
+              onSave={handleScheduleSaved}
+              onCancel={() => {
+                setShowAddForm(false)
+                setShowEditForm(false)
+                setSelectedSchedule(null)
+              }}
             />
           </div>
         )}
@@ -261,11 +310,31 @@ export default function SchedulesPage() {
                     <h3 className="text-lg font-semibold text-gray-900">{schedule.name}</h3>
                     <p className="text-gray-600">{schedule.description}</p>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    schedule.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {schedule.active ? 'Active' : 'Inactive'}
-                  </span>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={() => openEditForm(schedule)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteSchedule(schedule.id)}
+                      disabled={deletingId === schedule.id}
+                      className={`flex items-center text-sm font-medium ${
+                        deletingId === schedule.id
+                          ? 'text-red-400 cursor-not-allowed'
+                          : 'text-red-600 hover:text-red-700'
+                      }`}
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      {deletingId === schedule.id ? 'Deleting…' : 'Delete'}
+                    </button>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      schedule.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {schedule.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

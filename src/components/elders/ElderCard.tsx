@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Phone, MapPin, Calendar, AlertTriangle, MessageSquare, MoreVertical, Clock } from 'lucide-react'
+import { Phone, MapPin, Calendar, AlertTriangle, MessageSquare, MoreVertical, Clock, Trash2 } from 'lucide-react'
 import { formatDate, getInitials } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 
@@ -31,12 +31,14 @@ interface Schedule {
 interface ElderCardProps {
   elder: Elder
   onEdit: (elder: Elder) => void
+  onDeleted?: () => void
 }
 
-export function ElderCard({ elder, onEdit }: ElderCardProps) {
+export function ElderCard({ elder, onEdit, onDeleted }: ElderCardProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loadingSchedules, setLoadingSchedules] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   
   const fullName = `${elder.first_name} ${elder.last_name}`
   const initials = getInitials(fullName)
@@ -87,6 +89,44 @@ export function ElderCard({ elder, onEdit }: ElderCardProps) {
     }
   }
 
+  const handleDelete = async () => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this client? This will permanently remove the client and all associated data (call assignments, call history, notes, escalations). This action cannot be undone.'
+    )
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      // Attempt hard delete first
+      const { error: deleteError } = await supabase
+        .from('elders')
+        .delete()
+        .eq('id', elder.id)
+
+      if (deleteError) {
+        // Fallback to soft delete
+        const { error: updateError } = await supabase
+          .from('elders')
+          .update({ active: false, updated_at: new Date().toISOString() })
+          .eq('id', elder.id)
+
+        if (updateError) {
+          console.error('Error deleting elder:', deleteError, updateError)
+          alert('Failed to delete client')
+          return
+        }
+      }
+
+      if (onDeleted) onDeleted()
+    } catch (err) {
+      console.error('Unexpected error deleting elder:', err)
+      alert('Failed to delete client')
+    } finally {
+      setDeleting(false)
+      setMenuOpen(false)
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
@@ -121,6 +161,16 @@ export function ElderCard({ elder, onEdit }: ElderCardProps) {
                 className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded-lg"
               >
                 Edit
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className={`w-full text-left px-3 py-2 text-sm rounded-lg flex items-center ${
+                  deleting ? 'text-red-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'
+                }`}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           )}

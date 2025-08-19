@@ -123,6 +123,7 @@ export default function EldersPage() {
                 key={elder.id}
                 elder={elder}
                 onEdit={handleEditElder}
+                onDeleted={fetchElders}
               />
             ))}
           </div>
