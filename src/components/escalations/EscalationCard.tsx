@@ -26,11 +26,12 @@ interface EscalationIncident {
 
 interface EscalationCardProps {
   escalation: EscalationIncident
-  onViewDetails: (escalation: EscalationIncident) => void
+  onViewDetails?: (escalation: EscalationIncident) => void
   onResolve?: (escalation: EscalationIncident) => void
+  elderName?: string
 }
 
-export function EscalationCard({ escalation, onViewDetails, onResolve }: EscalationCardProps) {
+export function EscalationCard({ escalation, onViewDetails, onResolve, elderName }: EscalationCardProps) {
   const [expanded, setExpanded] = useState(false)
 
   const getSeverityColor = (severity: string) => {
@@ -74,6 +75,7 @@ export function EscalationCard({ escalation, onViewDetails, onResolve }: Escalat
   }
 
   const isResolved = escalation.status.toLowerCase() === 'resolved'
+  const displayElderName = elderName && elderName.length > 0 ? elderName : escalation.elder_name
   const canResolve = !isResolved && onResolve
 
   return (
@@ -85,7 +87,7 @@ export function EscalationCard({ escalation, onViewDetails, onResolve }: Escalat
             <AlertTriangle className="w-5 h-5 text-red-600" />
           </div>
           <div className="ml-3">
-            <h3 className="font-semibold text-gray-900">{escalation.elder_name}</h3>
+            <h3 className="font-semibold text-gray-900">{displayElderName}</h3>
             <p className="text-sm text-gray-600">{formatDateTime(escalation.created_at)}</p>
           </div>
         </div>
@@ -238,7 +240,7 @@ export function EscalationCard({ escalation, onViewDetails, onResolve }: Escalat
       {/* Actions */}
       <div className="flex justify-between items-center mt-4 pt-4 border-t border-gray-100">
         <button
-          onClick={() => onViewDetails(escalation)}
+          onClick={() => onViewDetails && onViewDetails(escalation)}
           className="text-sm text-blue-600 hover:text-blue-700 font-medium"
         >
           View Full Details →
