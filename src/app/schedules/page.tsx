@@ -167,7 +167,6 @@ export default function SchedulesPage() {
         .from('call_schedules')
         .select('*')
         .eq('org_id', currentOrg.id)
-        .eq('active', true)
         .order('created_at', { ascending: false })
 
       if (error) {
