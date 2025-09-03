@@ -32,7 +32,6 @@ export default function EldersPage() {
         .from('elders')
         .select('*')
         .eq('org_id', currentOrg.id)
-        .eq('active', true)
         .order('created_at', { ascending: false })
 
       if (error) {
