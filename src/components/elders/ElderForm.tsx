@@ -71,8 +71,8 @@ export function ElderForm({ elder, onCancel, onSave }: ElderFormProps) {
         expectedDigits = 9
         break
       case '+44':
-        expectedLength = 13 // +44 + 9 digits
-        expectedDigits = 9
+        expectedLength = 13 // +44 + 10 digits
+        expectedDigits = 10
         break
       default:
         return 'Invalid country code'
@@ -254,7 +254,7 @@ export function ElderForm({ elder, onCancel, onSave }: ElderFormProps) {
                       value={formData.phone.replace(new RegExp(`^\\${countryCode}`), '')}
                       onChange={handlePhoneChange}
                       className="flex-1 px-3 py-2 border border-gray-200 border-l-0 rounded-r-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-500"
-                      placeholder={countryCode === '+1' ? '5551234567' : countryCode === '+31' ? '612345678' : '729959925'}
+                      placeholder={countryCode === '+1' ? '5551234567' : countryCode === '+31' ? '612345678' : '7123456789'}
                       required
                     />
                   </div>
@@ -262,7 +262,7 @@ export function ElderForm({ elder, onCancel, onSave }: ElderFormProps) {
                     <p className="mt-1 text-sm text-red-600">{phoneError}</p>
                   )}
                   <p className="mt-1 text-xs text-gray-500">
-                    Format: +44729959925 (no spaces or special characters)
+                    Format: +447123456789 (no spaces or special characters)
                   </p>
                 </div>
                 
