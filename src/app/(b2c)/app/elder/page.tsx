@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, AlertCircle, Clock, Calendar, Edit2, X, Trash2, Plus, Phone, User } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Clock, Calendar, Edit2, X, Trash2, Plus, Phone, User, GripVertical } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { EmergencyContactForm } from '@/components/emergency/EmergencyContactForm'
@@ -17,6 +17,23 @@ import {
 } from '@/lib/phone'
 import { calculateNextScheduledTime } from '@/lib/utils'
 import { Tables } from '@/types/database'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 type Elder = Tables<'elders'>
 
@@ -759,6 +776,168 @@ export default function B2CElderPage() {
     }
   }
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event
+
+    if (!over || active.id === over.id || !elderId) {
+      return
+    }
+
+    const oldIndex = emergencyContacts.findIndex((contact) => contact.id === active.id)
+    const newIndex = emergencyContacts.findIndex((contact) => contact.id === over.id)
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return
+    }
+
+    // Reorder the contacts in state
+    const reorderedContacts = arrayMove(emergencyContacts, oldIndex, newIndex)
+    
+    // Update priority order in local state immediately
+    const updatedContacts = reorderedContacts.map((contact, index) => {
+      const newPriority = index + 1
+      return {
+        ...contact,
+        elder_assignments: contact.elder_assignments?.map((assignment) => ({
+          ...assignment,
+          "priority order": newPriority,
+        })),
+      }
+    })
+    
+    setEmergencyContacts(updatedContacts)
+
+    // Update priorities in database
+    try {
+      // Update all priorities sequentially (1, 2, 3, etc.)
+      const updates = updatedContacts.map((contact, index) => {
+        const assignmentId = contact.elder_assignments?.[0]?.id
+        if (!assignmentId) return null
+
+        return supabase
+          .from('elder_emergency_contact')
+          .update({ "priority order": index + 1 })
+          .eq('id', assignmentId)
+      }).filter(Boolean)
+
+      // Execute all updates
+      await Promise.all(updates as Promise<any>[])
+    } catch (err) {
+      console.error('Error updating priorities:', err)
+      // Revert on error
+      fetchEmergencyContacts(elderId)
+      alert('Failed to update priorities. Please try again.')
+    }
+  }
+
+  // Sortable Contact Item Component
+  const SortableContactItem = ({ contact }: { contact: EmergencyContact }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: contact.id })
+
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+    }
+
+    return (
+      <div
+        ref={setNodeRef}
+        style={style}
+        className={`rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow ${
+          isDragging ? 'shadow-lg' : ''
+        }`}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center flex-1 min-w-0">
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing mr-3 p-1 text-slate-400 hover:text-slate-600 transition-colors flex-shrink-0"
+              title="Drag to reorder"
+            >
+              <GripVertical className="w-4 h-4" />
+            </div>
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3 flex-shrink-0">
+              <User className="w-4 h-4 text-red-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-semibold text-slate-900 truncate">{contact.name}</h4>
+              <div className="flex items-center text-xs text-slate-600 mt-1">
+                <Phone className="w-3 h-3 mr-1 text-slate-400 flex-shrink-0" />
+                <span className="truncate">{contact.phone}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            <button
+              onClick={() => handleEditEmergencyContact(contact)}
+              className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition"
+              title="Edit Contact"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
+            <button
+              onClick={() => handleDeleteEmergencyContact(contact.id)}
+              className="p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition"
+              title="Delete Contact"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Assignment Info */}
+        {contact.elder_assignments && contact.elder_assignments.length > 0 && (
+          <div className="border-t border-slate-100 pt-3">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-500">Relation:</span>
+              <span className="text-slate-700 font-medium">
+                {contact.elder_assignments![0].relation}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-1 text-xs">
+              <span className="text-slate-500">Priority:</span>
+              <span className="text-slate-700 font-medium">
+                {contact.elder_assignments![0]["priority order"]}
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+            contact.active
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-slate-50 text-slate-700'
+          }`}>
+            {contact.active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // Set up drag sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
 
   if (loading) {
     return (
@@ -1239,78 +1418,22 @@ export default function B2CElderPage() {
                   No emergency contacts yet. Add contacts below to ensure quick response in urgent situations.
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {emergencyContacts.map((contact) => (
-                    <div
-                      key={contact.id}
-                      className="rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center">
-                          <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
-                            <User className="w-5 h-5 text-red-600" />
-                          </div>
-                          <div>
-                            <h4 className="text-base font-semibold text-slate-900">{contact.name}</h4>
-                            <div className="flex items-center text-sm text-slate-600 mt-1">
-                              <Phone className="w-4 h-4 mr-1 text-slate-400" />
-                              <span>{contact.phone}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEditEmergencyContact(contact)}
-                            className="p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 rounded-lg transition"
-                            title="Edit Contact"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeleteEmergencyContact(contact.id)}
-                            className="p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 rounded-lg transition"
-                            title="Delete Contact"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Assignment Info */}
-                      {contact.elder_assignments && contact.elder_assignments.length > 0 && (
-                        <div className="border-t border-slate-100 pt-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-slate-500">Relation:</span>
-                            <span className="text-xs text-slate-700">
-                              {contact.elder_assignments![0].relation}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <span className="text-xs text-slate-500">Priority:</span>
-                            <span className="text-xs text-slate-700">
-                              {contact.elder_assignments![0]["priority order"]}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-3 pt-3 border-t border-slate-100">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          contact.active
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-slate-50 text-slate-700'
-                        }`}>
-                          {contact.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={emergencyContacts.map((contact) => contact.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-3">
+                      {emergencyContacts.map((contact) => (
+                        <SortableContactItem key={contact.id} contact={contact} />
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </SortableContext>
+                </DndContext>
               )}
             </div>
 
