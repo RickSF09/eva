@@ -122,7 +122,7 @@ export default function AcceptInvitePage({ params }: PageProps) {
 
       setSuccess('Invitation accepted! Redirecting…')
       // After accepting, ensure the user sets password & profile
-      setTimeout(() => router.push('/onboarding/profile?next=/dashboard'), 800)
+      setTimeout(() => router.push('/b2b/onboarding/profile?next=/b2b/dashboard'), 800)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to accept invite')
     } finally {
@@ -141,7 +141,7 @@ export default function AcceptInvitePage({ params }: PageProps) {
 
   const handleSignIn = async () => {
     // Use root page for sign in/up flow
-    router.push('/')
+    router.push('/login')
   }
 
   const emailMatches = () => {

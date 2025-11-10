@@ -21,7 +21,7 @@ export default function ProfileSetupClient() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      router.replace('/')
+      router.replace('/login')
     }
   }, [user, authLoading, router])
 
@@ -89,7 +89,7 @@ export default function ProfileSetupClient() {
       if (upsertError) throw upsertError
 
       setSuccess('Profile saved')
-      const next = searchParams.get('next') || '/dashboard'
+      const next = searchParams.get('next') || '/b2b/dashboard'
       router.replace(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save profile')

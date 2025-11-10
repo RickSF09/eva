@@ -19,12 +19,12 @@ import { useOrganizations } from '@/hooks/useOrganizations'
 import { cn } from '@/lib/utils'
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: Home },
-  { name: 'Monitoring', href: '/monitoring', icon: ActivitySquare },
-  { name: 'Clients', href: '/elders', icon: Users },
-  { name: 'Schedules', href: '/schedules', icon: Calendar },
-  { name: 'Emergency Contacts', href: '/emergency-contacts', icon: Users },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Dashboard', href: '/b2b/dashboard', icon: Home },
+  { name: 'Monitoring', href: '/b2b/monitoring', icon: ActivitySquare },
+  { name: 'Clients', href: '/b2b/elders', icon: Users },
+  { name: 'Schedules', href: '/b2b/schedules', icon: Calendar },
+  { name: 'Emergency Contacts', href: '/b2b/emergency-contacts', icon: Users },
+  { name: 'Settings', href: '/b2b/settings', icon: Settings },
 ]
 
 export function Sidebar() {

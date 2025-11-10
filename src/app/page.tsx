@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useOrganizations } from '@/hooks/useOrganizations'
@@ -9,62 +9,93 @@ import { SignUpForm } from '@/components/auth/SignUpForm'
 import { OrganizationSetup } from '@/components/onboarding/OrganizationSetup'
 import { supabase } from '@/lib/supabase'
 
+type AccountType = 'b2b' | 'b2c'
+
 export default function Home() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
-  const { organizations, currentOrg, loading: orgLoading } = useOrganizations()
+  const { organizations, loading: orgLoading } = useOrganizations()
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
-  const [userRecord, setUserRecord] = useState<any>(null)
+  const [accountType, setAccountType] = useState<AccountType | null>(null)
+  const [profileLoading, setProfileLoading] = useState(false)
 
   useEffect(() => {
-    if (user) {
-      fetchUserRecord()
+    if (!user) {
+      setAccountType(null)
+      return
+    }
+
+    let active = true
+    setProfileLoading(true)
+
+    const fetchProfile = async () => {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('account_type')
+          .eq('auth_user_id', user.id)
+          .maybeSingle()
+
+        if (!active) return
+
+        if (data?.account_type === 'b2b' || data?.account_type === 'b2c') {
+          setAccountType(data.account_type)
+        } else {
+          setAccountType('b2b')
+        }
+      } finally {
+        if (active) {
+          setProfileLoading(false)
+        }
+      }
+    }
+
+    fetchProfile()
+
+    return () => {
+      active = false
     }
   }, [user])
 
   useEffect(() => {
-    // If user is authenticated and has organizations, redirect to dashboard
-    if (!authLoading && !orgLoading && user && organizations.length > 0) {
-      router.push('/dashboard')
+    if (!user || authLoading || profileLoading) {
+      return
     }
-  }, [user, organizations, authLoading, orgLoading, router])
 
-  const fetchUserRecord = async () => {
-    if (!user) return
-
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_user_id', user.id)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching user record:', error)
-      } else {
-        setUserRecord(data)
+    if (accountType === 'b2c') {
+      router.replace('/app/home')
+    } else if (accountType === 'b2b' && !orgLoading) {
+      if (organizations.length > 0) {
+        router.replace('/b2b/dashboard')
       }
-    } catch (err) {
-      console.error('Error fetching user record:', err)
     }
-  }
+  }, [user, authLoading, profileLoading, accountType, orgLoading, organizations.length, router])
 
-  // Loading state
-  if (authLoading || orgLoading) {
+  const showOrganizationSetup = useMemo(() => {
+    return (
+      !!user &&
+      accountType === 'b2b' &&
+      !authLoading &&
+      !profileLoading &&
+      !orgLoading &&
+      organizations.length === 0
+    )
+  }, [user, accountType, authLoading, profileLoading, orgLoading, organizations.length])
+
+  if (authLoading || profileLoading || (accountType === 'b2b' && orgLoading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Loading your workspace…</p>
         </div>
       </div>
     )
   }
 
-  // Not authenticated - show auth forms
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         {authMode === 'login' ? (
           <LoginForm onToggleMode={() => setAuthMode('signup')} />
         ) : (
@@ -74,22 +105,19 @@ export default function Home() {
     )
   }
 
-  // User exists but no organizations - show org setup
-  if (!orgLoading && organizations.length === 0) {
+  if (showOrganizationSetup) {
     return (
-      <OrganizationSetup 
-        onComplete={() => window.location.reload()} 
-      />
+      <OrganizationSetup onComplete={() => router.replace('/b2b/dashboard')} />
     )
   }
 
-  // If we get here, user is authenticated and has organizations, but redirect hasn't happened yet
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Redirecting to dashboard...</p>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto"></div>
+        <p className="mt-4 text-slate-600">Redirecting to your workspace…</p>
       </div>
     </div>
   )
 }
+

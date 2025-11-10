@@ -15,6 +15,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     firstName: '',
     lastName: '',
     phone: '',
+    accountType: 'b2b' as 'b2b' | 'b2c',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -33,11 +34,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: siteUrl ? `${siteUrl}/dashboard` : undefined,
+          emailRedirectTo: siteUrl,
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
             phone: formData.phone,
+            account_type: formData.accountType,
           },
         },
       })
@@ -57,6 +59,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             first_name: formData.firstName,
             last_name: formData.lastName,
             phone: formData.phone,
+            account_type: formData.accountType,
           })
 
         if (userError) {
@@ -109,6 +112,38 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              I am signing up as
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, accountType: 'b2b' })}
+                className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                  formData.accountType === 'b2b'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                Business (teams)
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, accountType: 'b2c' })}
+                className={`rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+                  formData.accountType === 'b2c'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                }`}
+              >
+                Family (caregiver)
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Choose “Business” if you manage care for multiple elders or teams. Choose “Family” for a single loved one.
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">

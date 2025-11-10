@@ -93,13 +93,13 @@ export default function DashboardPage() {
   const handleQuickAction = (action: string) => {
     switch (action) {
       case 'add-client':
-        router.push('/elders')
+        router.push('/b2b/elders')
         break
       case 'create-schedule':
-        router.push('/schedules')
+        router.push('/b2b/schedules')
         break
       case 'add-emergency-contact':
-        router.push('/emergency-contacts')
+        router.push('/b2b/emergency-contacts')
         break
       default:
         break

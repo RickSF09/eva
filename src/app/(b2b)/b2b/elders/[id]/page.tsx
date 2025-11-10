@@ -249,7 +249,7 @@ export default function ElderDetailPage({ params }: PageProps) {
             <button
               onClick={() => {
                 const from = searchParams.get('from')
-                router.push(from === 'monitoring' ? '/monitoring' : '/elders')
+                router.push(from === 'monitoring' ? '/b2b/monitoring' : '/b2b/elders')
               }}
               className="inline-flex items-center px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700"
             >

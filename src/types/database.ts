@@ -105,13 +105,21 @@ export type Database = {
           created_at: string
           elder_id: string
           id: string
+          instructions: string | null
+          meta_data: Json | null
+          open_ai_call_id: string | null
+          open_ai_session_id: string | null
           retry_count: number | null
           schedule_id: string | null
           scheduled_for: string
           status: string
+          to_number: string | null
           twilio_call_sid: string | null
+          twilio_child_call_sid: string | null
           updated_at: string
           vapi_call_id: string | null
+          voice: string | null
+          webhook_url: string | null
         }
         Insert: {
           attempted_at?: string | null
@@ -120,13 +128,21 @@ export type Database = {
           created_at?: string
           elder_id: string
           id?: string
+          instructions?: string | null
+          meta_data?: Json | null
+          open_ai_call_id?: string | null
+          open_ai_session_id?: string | null
           retry_count?: number | null
           schedule_id?: string | null
           scheduled_for: string
           status?: string
+          to_number?: string | null
           twilio_call_sid?: string | null
+          twilio_child_call_sid?: string | null
           updated_at?: string
           vapi_call_id?: string | null
+          voice?: string | null
+          webhook_url?: string | null
         }
         Update: {
           attempted_at?: string | null
@@ -135,13 +151,21 @@ export type Database = {
           created_at?: string
           elder_id?: string
           id?: string
+          instructions?: string | null
+          meta_data?: Json | null
+          open_ai_call_id?: string | null
+          open_ai_session_id?: string | null
           retry_count?: number | null
           schedule_id?: string | null
           scheduled_for?: string
           status?: string
+          to_number?: string | null
           twilio_call_sid?: string | null
+          twilio_child_call_sid?: string | null
           updated_at?: string
           vapi_call_id?: string | null
+          voice?: string | null
+          webhook_url?: string | null
         }
         Relationships: [
           {
@@ -913,6 +937,70 @@ export type Database = {
           },
         ]
       }
+      organization_invitations: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          email: string
+          email_normalized: string | null
+          expires_at: string | null
+          id: string
+          org_id: string
+          role: string
+          status: string
+          token: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          email: string
+          email_normalized?: string | null
+          expires_at?: string | null
+          id?: string
+          org_id: string
+          role?: string
+          status?: string
+          token: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          email?: string
+          email_normalized?: string | null
+          expires_at?: string | null
+          id?: string
+          org_id?: string
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invitations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "user_current_context"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "organization_invitations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_invitations_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string
@@ -1087,6 +1175,7 @@ export type Database = {
       }
       users: {
         Row: {
+          account_type: "b2b" | "b2c" | null
           auth_user_id: string | null
           created_at: string
           email: string
@@ -1097,6 +1186,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          account_type?: "b2b" | "b2c" | null
           auth_user_id?: string | null
           created_at?: string
           email: string
@@ -1107,6 +1197,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          account_type?: "b2b" | "b2c" | null
           auth_user_id?: string | null
           created_at?: string
           email?: string
@@ -1324,4 +1415,5 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
 

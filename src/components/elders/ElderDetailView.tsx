@@ -48,7 +48,11 @@ export function ElderDetailView({ elderId, onClose }: ElderDetailViewProps) {
 
     // compute weekly stats
     const totalCount = data?.length || 0
-    const completed = (data || []).filter(r => r.call_status === 'completed').length
+    const completed = (data || []).filter((r: any) => {
+      const status = (r.call_status || '').toLowerCase()
+      const isCompletedStatus = ['completed', 'success', 'succeeded', 'completed_successfully'].includes(status)
+      return isCompletedStatus || !!r.call_ended_at
+    }).length
     const completionRate = totalCount > 0 ? completed / totalCount : 0
     const sentiments = (data || []).map(r => r.sentiment_score).filter((v:any) => typeof v === 'number') as number[]
     const averageSentiment = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : null

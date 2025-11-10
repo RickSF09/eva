@@ -3,7 +3,7 @@
 import { formatDateTime, formatDuration } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Phone, AlertTriangle, ArrowRight, CheckCircle, XCircle, User } from 'lucide-react'
+import { Phone, AlertTriangle, ArrowRight, CheckCircle, XCircle, User, ChevronDown } from 'lucide-react'
 
 interface CallReportModalProps {
   report: {
@@ -23,6 +23,7 @@ interface CallReportModalProps {
     recording_url?: string | null
     execution_id?: string
     health_indicators?: any
+    elder_id?: string
   }
   onClose: () => void
   onOpenReport?: (report: any) => void
@@ -34,6 +35,8 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
     attempts?: any[]
     followups?: any[]
   }>({})
+  const [healthOpen, setHealthOpen] = useState(false)
+  const [elderName, setElderName] = useState<string>('User')
 
   // Normalize mood value in 0..1 for consistent display
   const moodValue = (() => {
@@ -68,6 +71,25 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
       void loadEscalationFlow()
     }
   }, [report.id])
+
+  useEffect(() => {
+    if (report.elder_id) {
+      void fetchElderName()
+    }
+  }, [report.elder_id])
+
+  const fetchElderName = async () => {
+    if (!report.elder_id) return
+    const { data } = await supabase
+      .from('elders')
+      .select('first_name, last_name')
+      .eq('id', report.elder_id)
+      .single()
+    
+    if (data) {
+      setElderName(`${data.first_name} ${data.last_name}`)
+    }
+  }
 
   const loadEscalationFlow = async () => {
     // Find escalation incident linked to this report or execution
@@ -182,69 +204,7 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
             </div>
           </section>
 
-          {report.health_indicators && (
-            <section>
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Health Indicators</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Mental Health */}
-                {'mental_health' in (report.health_indicators || {}) && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-xs text-gray-500 font-medium mb-2">Mental Health</div>
-                    <div className="space-y-1 text-sm">
-                      {Object.entries(report.health_indicators.mental_health || {})
-                        .filter(([_, v]) => v !== null)
-                        .map(([k, v]) => (
-                          <div key={`mh-${k}`} className="flex items-center justify-between">
-                            <span className="text-gray-700 capitalize">{k.replaceAll('_',' ')}</span>
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeof v === 'boolean' ? (v ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : 'bg-blue-100 text-blue-700'}`}>
-                              {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Physical Health */}
-                {'physical_health' in (report.health_indicators || {}) && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-xs text-gray-500 font-medium mb-2">Physical Health</div>
-                    <div className="space-y-1 text-sm">
-                      {Object.entries(report.health_indicators.physical_health || {})
-                        .filter(([_, v]) => v !== null)
-                        .map(([k, v]) => (
-                          <div key={`ph-${k}`} className="flex items-center justify-between">
-                            <span className="text-gray-700 capitalize">{k.replaceAll('_',' ')}</span>
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeof v === 'boolean' ? (v ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : 'bg-blue-100 text-blue-700'}`}>
-                              {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Social Environment */}
-                {'social_environment' in (report.health_indicators || {}) && (
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-xs text-gray-500 font-medium mb-2">Social Environment</div>
-                    <div className="space-y-1 text-sm">
-                      {Object.entries(report.health_indicators.social_environment || {})
-                        .filter(([_, v]) => v !== null)
-                        .map(([k, v]) => (
-                          <div key={`se-${k}`} className="flex items-center justify-between">
-                            <span className="text-gray-700 capitalize">{k.replaceAll('_',' ')}</span>
-                            <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeof v === 'boolean' ? (v ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : 'bg-blue-100 text-blue-700'}`}>
-                              {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
-                            </span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
-          )}
+          
 
           {report.escalation_triggered && (
             <section>
@@ -330,18 +290,163 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
 
           <section>
             <h3 className="text-sm font-semibold text-gray-900 mb-2">Transcript</h3>
-            <div className="bg-gray-50 rounded p-3 text-sm text-gray-800 whitespace-pre-wrap">
-              {(report.transcript || 'No transcript recorded').split(/\n/).map((line, idx) => {
-                const isAI = line.trim().toLowerCase().startsWith('ai:')
-                const isUser = line.trim().toLowerCase().startsWith('user:')
-                return (
-                  <div key={idx}>
-                    {isAI ? (<><span className="font-semibold">AI:</span>{line.slice(3)}</>) : isUser ? (<><span className="font-semibold">User:</span>{line.slice(5)}</>) : line}
-                  </div>
-                )
-              })}
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {(() => {
+                if (!report.transcript) {
+                  return <div className="text-sm text-gray-600">No transcript recorded</div>
+                }
+
+                try {
+                  // Try to parse as JSON first
+                  const transcriptData = typeof report.transcript === 'string' 
+                    ? JSON.parse(report.transcript) 
+                    : report.transcript
+                  
+                  if (Array.isArray(transcriptData) && transcriptData.length > 0) {
+                    return transcriptData.map((item: any, idx: number) => {
+                      const isAI = item.speaker === 'AI' || item.speaker === 'ai'
+                      const isUser = item.speaker === 'User' || item.speaker === 'user'
+                      const text = item.text || String(item)
+                      
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
+                              isUser
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 text-gray-900'
+                            }`}
+                          >
+                            <div className="text-xs font-medium mb-1 opacity-70">
+                              {isAI ? 'EVA' : elderName}
+                            </div>
+                            <div className="whitespace-pre-wrap">{text}</div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  }
+                  // If not an array, fall through to plain text parsing
+                } catch {
+                  // Fallback to plain text parsing
+                  const lines = String(report.transcript || 'No transcript recorded').split(/\n/)
+                  return lines.map((line, idx) => {
+                    if (!line.trim()) return null
+                    const isAI = line.trim().toLowerCase().startsWith('ai:')
+                    const isUser = line.trim().toLowerCase().startsWith('user:')
+                    const text = isAI ? line.slice(3).trim() : isUser ? line.slice(5).trim() : line
+                    
+                    if (!isAI && !isUser) {
+                      return (
+                        <div key={idx} className="text-sm text-gray-600 whitespace-pre-wrap">
+                          {text}
+                        </div>
+                      )
+                    }
+                    
+                    return (
+                      <div
+                        key={idx}
+                        className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
+                            isUser
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-gray-100 text-gray-900'
+                          }`}
+                        >
+                          <div className="text-xs font-medium mb-1 opacity-70">
+                            {isAI ? 'EVA' : elderName}
+                          </div>
+                          <div className="whitespace-pre-wrap">{text}</div>
+                        </div>
+                      </div>
+                    )
+                  }).filter(Boolean)
+                }
+                
+                // Final fallback if nothing matched
+                return <div className="text-sm text-gray-600">No transcript recorded</div>
+              })()}
             </div>
           </section>
+
+          {report.health_indicators && (
+            <section>
+              <button
+                type="button"
+                className="w-full flex items-center justify-between mb-2"
+                onClick={() => setHealthOpen(v => !v)}
+              >
+                <h3 className="text-sm font-semibold text-gray-900">Health Indicators</h3>
+                <ChevronDown className={`w-4 h-4 text-gray-700 transition-transform ${healthOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {healthOpen && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Mental Health */}
+                  {'mental_health' in (report.health_indicators || {}) && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-xs text-gray-500 font-medium mb-2">Mental Health</div>
+                      <div className="space-y-1 text-sm">
+                        {Object.entries(report.health_indicators.mental_health || {})
+                          .filter(([_, v]) => v !== null)
+                          .map(([k, v]) => (
+                            <div key={`mh-${k}`} className="flex items-center justify-between">
+                              <span className="text-gray-700 capitalize">{k.replaceAll('_',' ')}</span>
+                              <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeof v === 'boolean' ? (v ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : 'bg-blue-100 text-blue-700'}`}>
+                                {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Physical Health */}
+                  {'physical_health' in (report.health_indicators || {}) && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-xs text-gray-500 font-medium mb-2">Physical Health</div>
+                      <div className="space-y-1 text-sm">
+                        {Object.entries(report.health_indicators.physical_health || {})
+                          .filter(([_, v]) => v !== null)
+                          .map(([k, v]) => (
+                            <div key={`ph-${k}`} className="flex items-center justify-between">
+                              <span className="text-gray-700 capitalize">{k.replaceAll('_',' ')}</span>
+                              <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeof v === 'boolean' ? (v ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : 'bg-blue-100 text-blue-700'}`}>
+                                {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Social Environment */}
+                  {'social_environment' in (report.health_indicators || {}) && (
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <div className="text-xs text-gray-500 font-medium mb-2">Social Environment</div>
+                      <div className="space-y-1 text-sm">
+                        {Object.entries(report.health_indicators.social_environment || {})
+                          .filter(([_, v]) => v !== null)
+                          .map(([k, v]) => (
+                            <div key={`se-${k}`} className="flex items-center justify-between">
+                              <span className="text-gray-700 capitalize">{k.replaceAll('_',' ')}</span>
+                              <span className={`text-xs font-medium px-2 py-1 rounded-full ${typeof v === 'boolean' ? (v ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700') : 'bg-blue-100 text-blue-700'}`}>
+                                {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </div>
     </div>

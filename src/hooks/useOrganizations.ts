@@ -36,7 +36,7 @@ export function useOrganizations() {
       // First get the user record from users table
       const { data: userRecord, error: userError } = await supabase
         .from('users')
-        .select('id')
+        .select('id, account_type')
         .eq('auth_user_id', user?.id)
         .single()
 
@@ -47,6 +47,12 @@ export function useOrganizations() {
 
       if (!userRecord) {
         console.log('No user record found, user may not be set up yet')
+        setOrganizations([])
+        setCurrentOrg(null)
+        return
+      }
+
+      if (userRecord.account_type !== 'b2b') {
         setOrganizations([])
         setCurrentOrg(null)
         return

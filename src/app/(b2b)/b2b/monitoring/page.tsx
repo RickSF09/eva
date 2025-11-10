@@ -25,51 +25,72 @@ export default function MonitoringPage() {
   }, [currentOrg])
 
   const fetchElders = async () => {
-    const { data } = await supabase
-      .from('elders')
-      .select('*')
-      .eq('org_id', currentOrg!.id)
-      .eq('active', true)
-      .order('first_name')
-    setElders(data || [])
+    try {
+      const { data, error } = await supabase
+        .from('elders')
+        .select('*')
+        .eq('org_id', currentOrg!.id)
+        .eq('active', true)
+        .order('first_name')
+      if (error) throw error
+      setElders(data || [])
 
-    // fetch last 7d reports per elder
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    const { data: reports } = await supabase
-      .from('post_call_reports')
-      .select(`
-        *,
-        call_executions!inner(
-          call_type
-        )
-      `)
-      .in('elder_id', (data || []).map(e => e.id))
-      .gte('call_started_at', since)
+      const elderIds = (data || []).map(e => e.id)
+      if (!elderIds.length) {
+        setReportsByElder({})
+        setEscalationsByElder({})
+        return
+      }
 
-    const byElder: Record<string, any[]> = {}
-    for (const r of reports || []) {
-      byElder[r.elder_id] = byElder[r.elder_id] || []
-      byElder[r.elder_id].push(r)
+      // fetch last 7d reports per elder
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const { data: reports, error: reportsErr } = await supabase
+        .from('post_call_reports')
+        .select(`
+          *,
+          call_executions!inner(
+            call_type
+          )
+        `)
+        .in('elder_id', elderIds)
+        .gte('call_started_at', since)
+        .order('call_started_at', { ascending: false })
+      if (reportsErr) throw reportsErr
+
+      const byElder: Record<string, any[]> = {}
+      for (const r of reports || []) {
+        byElder[r.elder_id] = byElder[r.elder_id] || []
+        byElder[r.elder_id].push(r)
+      }
+      setReportsByElder(byElder)
+
+      const { data: escalations, error: escErr } = await supabase
+        .from('escalation_incidents')
+        .select('elder_id')
+        .in('elder_id', elderIds)
+        .gte('created_at', since)
+      if (escErr) throw escErr
+
+      const escByElder: Record<string, number> = {}
+      for (const row of escalations || []) {
+        escByElder[row.elder_id] = (escByElder[row.elder_id] || 0) + 1
+      }
+      setEscalationsByElder(escByElder)
+    } catch (err) {
+      console.error('Monitoring fetch error:', err)
+      setReportsByElder({})
+      setEscalationsByElder({})
     }
-    setReportsByElder(byElder)
-
-    const { data: escalations } = await supabase
-      .from('escalation_incidents')
-      .select('elder_id')
-      .in('elder_id', (data || []).map(e => e.id))
-      .gte('created_at', since)
-
-    const escByElder: Record<string, number> = {}
-    for (const row of escalations || []) {
-      escByElder[row.elder_id] = (escByElder[row.elder_id] || 0) + 1
-    }
-    setEscalationsByElder(escByElder)
   }
 
   const computeStats = (elderId: string): WeeklyCallStats => {
     const reports = reportsByElder[elderId] || []
     const total = reports.length
-    const completed = reports.filter(r => r.call_status === 'completed').length
+    const completed = reports.filter((r: any) => {
+      const status = (r.call_status || '').toLowerCase()
+      const isCompletedStatus = ['completed', 'success', 'succeeded', 'completed_successfully'].includes(status)
+      return isCompletedStatus || !!r.call_ended_at
+    }).length
     const sentiments = reports.map((r: any) => r.sentiment_score).filter(Boolean) as number[]
     const averageSentiment = sentiments.length ? sentiments.reduce((a, b) => a + b, 0) / sentiments.length : null
     return {
@@ -132,7 +153,7 @@ export default function MonitoringPage() {
               elder={elder}
               stats={computeStats(elder.id)}
               lastCall={lastCallFor(elder.id)}
-              onOpenDetail={(id) => router.push(`/elders/${id}?from=monitoring`)}
+              onOpenDetail={(id) => router.push(`/b2b/elders/${id}?from=monitoring`)}
             />
           ))}
         </div>
