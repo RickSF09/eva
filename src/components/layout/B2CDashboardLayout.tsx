@@ -37,10 +37,8 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
   return (
     <div className="flex h-screen bg-slate-50">
       <B2CSidebar />
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
-          {children}
-        </div>
+      <main className="flex-1 overflow-auto px-8 py-8">
+        {children}
       </main>
     </div>
   )

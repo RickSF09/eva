@@ -161,76 +161,74 @@ export default function B2CHomePage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Call History</h2>
-          {callReports.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              {callReports.map((report) => {
-                const moodValue = typeof report.sentiment_score === 'number'
-                  ? report.sentiment_score
-                  : parseFloat(String(report.mood_assessment ?? ''))
-                const moodDisplay = Number.isFinite(moodValue)
-                  ? `${Math.round(moodValue * 100)}%`
-                  : report.mood_assessment || 'N/A'
+      <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Call History</h2>
+        {callReports.length > 0 ? (
+          <div className="mt-4 space-y-3">
+            {callReports.map((report) => {
+              const moodValue = typeof report.sentiment_score === 'number' 
+                ? report.sentiment_score 
+                : parseFloat(String(report.mood_assessment ?? ''))
+              const moodDisplay = Number.isFinite(moodValue) 
+                ? `${Math.round(moodValue * 100)}%`
+                : report.mood_assessment || 'N/A'
 
-                return (
-                  <button
-                    key={report.id}
-                    onClick={() => setSelectedReport(report)}
-                    className="w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 hover:border-slate-300 transition-colors group"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                          <span className="text-sm text-slate-600">
-                            {formatDateTime(report.call_started_at)}
+              return (
+                <button
+                  key={report.id}
+                  onClick={() => setSelectedReport(report)}
+                  className="w-full text-left border border-slate-200 rounded-lg p-4 hover:bg-slate-50 hover:border-slate-300 transition-colors group"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <span className="text-sm text-slate-600">
+                          {formatDateTime(report.call_started_at)}
+                        </span>
+                        {report.duration_seconds && (
+                          <span className="text-xs text-slate-500">
+                            • {formatDuration(report.duration_seconds)}
                           </span>
-                          {report.duration_seconds && (
-                            <span className="text-xs text-slate-500">
-                              • {formatDuration(report.duration_seconds)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 mb-2 flex-wrap">
-                          {report.escalation_triggered && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                              <AlertTriangle className="w-3 h-3 mr-1" />
-                              Escalated
-                            </span>
-                          )}
-                          <span className="text-xs text-slate-600">
-                            Mood: <span className="font-medium text-slate-900">{moodDisplay}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        {report.escalation_triggered && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Escalated
                           </span>
-                        </div>
-                        <p className="text-sm text-slate-700 line-clamp-2">
-                          {report.summary || 'No summary available'}
-                        </p>
+                        )}
+                        <span className="text-xs text-slate-600">
+                          Mood: <span className="font-medium text-slate-900">{moodDisplay}</span>
+                        </span>
                       </div>
-                      <div className="flex items-center text-xs text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
-                        View details <ChevronRight className="w-4 h-4 ml-1" />
-                      </div>
+                      <p className="text-sm text-slate-700 line-clamp-2">
+                        {report.summary || 'No summary available'}
+                      </p>
                     </div>
-                  </button>
-                )
-              })}
-            </div>
-          ) : (
-            <div className="mt-4 text-sm text-slate-600">
-              <p>No calls have been completed yet. We&apos;ll show updates here once the first call finishes.</p>
-            </div>
-          )}
-        </section>
+                    <div className="flex items-center text-xs text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
+                      View details <ChevronRight className="w-4 h-4 ml-1" />
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 text-sm text-slate-600">
+            <p>No calls have been completed yet. We&apos;ll show updates here once the first call finishes.</p>
+          </div>
+        )}
+      </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Need help?</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Reach us at <a href="mailto:support@evacares.com" className="text-slate-900 underline">support@evacares.com</a>{' '}
-            or call +1 (555) 123-4567 for urgent assistance.
-          </p>
-        </section>
-      </div>
+      <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900">Need help?</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          Reach us at <a href="mailto:support@evacares.com" className="text-slate-900 underline">support@evacares.com</a>{' '}
+          or call +1 (555) 123-4567 for urgent assistance.
+        </p>
+      </section>
 
       {selectedReport && (
         <CallReportModal
