@@ -1389,8 +1389,9 @@ export default function B2CElderPage() {
         )}
       </section>
 
-      {/* Emergency Contacts Section */}
-      <section className="space-y-5 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Emergency Contacts Section */}
+        <section className="space-y-5 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <User className="h-5 w-5 text-slate-500" />
@@ -1448,6 +1449,7 @@ export default function B2CElderPage() {
           </>
         )}
       </section>
+      </div>
 
       {/* Emergency Contact Modals */}
       {showAddEmergencyContact && (
