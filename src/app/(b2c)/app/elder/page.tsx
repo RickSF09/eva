@@ -1077,12 +1077,13 @@ export default function B2CElderPage() {
         )}
       </form>
 
-      <section className="space-y-5 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-slate-500" />
-            <h2 className="text-lg font-semibold text-slate-900">Call Scheduling</h2>
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="space-y-5 rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-slate-500" />
+              <h2 className="text-lg font-semibold text-slate-900">Call Scheduling</h2>
+            </div>
           <p className="text-sm text-slate-600">
             Create one or more schedules so Eva knows when to place automated check-in calls. You can edit or add more later.
           </p>
@@ -1442,12 +1443,12 @@ export default function B2CElderPage() {
               onClick={() => setShowAddEmergencyContact(true)}
               className="w-full rounded-xl border-2 border-dashed border-slate-300 bg-white px-6 py-4 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition"
             >
-              <Plus className="w-4 h-4 mr-2 inline" />
-              Add Emergency Contact
+              + Add Emergency Contact
             </button>
           </>
         )}
       </section>
+      </div>
 
       {/* Emergency Contact Modals */}
       {showAddEmergencyContact && (
