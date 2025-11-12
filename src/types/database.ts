@@ -1182,6 +1182,12 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_cancel_at_period_end: boolean | null
+          subscription_current_period_end: string | null
+          subscription_plan: string | null
+          subscription_status: string | null
           phone: string | null
           updated_at: string
         }
@@ -1193,6 +1199,12 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_cancel_at_period_end?: boolean | null
+          subscription_current_period_end?: string | null
+          subscription_plan?: string | null
+          subscription_status?: string | null
           phone?: string | null
           updated_at?: string
         }
@@ -1204,6 +1216,12 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_cancel_at_period_end?: boolean | null
+          subscription_current_period_end?: string | null
+          subscription_plan?: string | null
+          subscription_status?: string | null
           phone?: string | null
           updated_at?: string
         }

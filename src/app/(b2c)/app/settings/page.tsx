@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
+import { SubscriptionManager } from '@/components/billing/SubscriptionManager'
 
 interface ProfileForm {
   first_name: string
@@ -260,6 +261,9 @@ export default function B2CSettingsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* Billing - Top Left */}
+        <SubscriptionManager />
+
         {/* User Profile - Top Left */}
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
