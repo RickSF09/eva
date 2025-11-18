@@ -13,6 +13,8 @@ export default function SettingsPage() {
   const { currentOrg } = useOrganizations()
   const [userProfile, setUserProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetPasswordStatus, setResetPasswordStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     if (user) {
@@ -40,6 +42,46 @@ export default function SettingsPage() {
       console.error('Error fetching user profile:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResetPassword = async () => {
+    if (!user?.email) {
+      setResetPasswordStatus({
+        type: 'error',
+        message: 'We could not find an email for your account.',
+      })
+      return
+    }
+
+    setResettingPassword(true)
+    setResetPasswordStatus(null)
+
+    try {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : null)
+      const redirectTo = baseUrl ? `${baseUrl}/login` : undefined
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        user.email,
+        redirectTo ? { redirectTo } : undefined
+      )
+
+      if (error) throw error
+
+      setResetPasswordStatus({
+        type: 'success',
+        message: 'Password reset link sent. Check your email for further instructions.',
+      })
+    } catch (error) {
+      console.error('Error sending password reset email:', error)
+      setResetPasswordStatus({
+        type: 'error',
+        message: 'Unable to send reset link. Please try again or contact support.',
+      })
+    } finally {
+      setResettingPassword(false)
     }
   }
 
@@ -158,11 +200,32 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-gray-900">Security</h2>
             </div>
 
-            <div className="space-y-4">
-              <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+            <div className="space-y-3">
+              <button
+                onClick={handleResetPassword}
+                disabled={resettingPassword}
+                className={`w-full text-left rounded-lg border border-gray-200 px-4 py-3 transition-colors ${
+                  resettingPassword
+                    ? 'bg-gray-50 cursor-not-allowed text-gray-500'
+                    : 'hover:bg-gray-50'
+                }`}
+              >
                 <div className="font-medium text-gray-900">Change Password</div>
-                <div className="text-sm text-gray-600">Update your account password</div>
+                <div className="text-sm text-gray-600">
+                  {resettingPassword ? 'Sending reset link...' : 'Update your account password.'}
+                </div>
               </button>
+              {resetPasswordStatus && (
+                <p
+                  className={`text-sm rounded-lg border px-3 py-2 ${
+                    resetPasswordStatus.type === 'success'
+                      ? 'border-green-100 bg-green-50 text-green-700'
+                      : 'border-red-100 bg-red-50 text-red-700'
+                  }`}
+                >
+                  {resetPasswordStatus.message}
+                </p>
+              )}
               <button className="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
                 <div className="font-medium text-gray-900">Two-Factor Authentication</div>
                 <div className="text-sm text-gray-600">Add an extra layer of security</div>

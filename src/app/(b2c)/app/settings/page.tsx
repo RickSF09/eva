@@ -58,6 +58,8 @@ export default function B2CSettingsPage() {
   const [emailPrefsMessage, setEmailPrefsMessage] = useState<string | null>(null)
   const [isEditingProfile, setIsEditingProfile] = useState(false)
   const [newEmailInput, setNewEmailInput] = useState('')
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetPasswordStatus, setResetPasswordStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   // Close edit mode when profile is successfully saved
   useEffect(() => {
@@ -248,6 +250,46 @@ export default function B2CSettingsPage() {
       setEmailPrefsMessage('We could not update your email preferences. Please try again.')
     } finally {
       setSavingEmailPrefs(false)
+    }
+  }
+
+  const handlePasswordReset = async () => {
+    if (!user?.email) {
+      setResetPasswordStatus({
+        type: 'error',
+        message: 'No email is associated with your account.',
+      })
+      return
+    }
+
+    setResettingPassword(true)
+    setResetPasswordStatus(null)
+
+    try {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : null)
+      const redirectTo = baseUrl ? `${baseUrl}/login` : undefined
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        user.email,
+        redirectTo ? { redirectTo } : undefined
+      )
+
+      if (error) throw error
+
+      setResetPasswordStatus({
+        type: 'success',
+        message: 'We emailed you a password reset link.',
+      })
+    } catch (error) {
+      console.error('Failed to send password reset email', error)
+      setResetPasswordStatus({
+        type: 'error',
+        message: 'Unable to send reset email. Please try again.',
+      })
+    } finally {
+      setResettingPassword(false)
     }
   }
 
@@ -574,10 +616,27 @@ export default function B2CSettingsPage() {
           </div>
 
           <div className="space-y-4">
-            <div>
-              <p className="text-sm text-slate-600 mb-1">Change Password</p>
-              <p className="text-xs text-slate-500">Update your account password.</p>
-            </div>
+            <button
+              type="button"
+              onClick={handlePasswordReset}
+              disabled={resettingPassword}
+              className="w-full text-left rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
+            >
+              <div className="font-medium text-slate-900">Change Password</div>
+              <div className="text-xs text-slate-500">Update your account password.</div>
+            </button>
+            {resetPasswordStatus && (
+              <p
+                className={`text-sm rounded-lg border px-3 py-2 ${
+                  resetPasswordStatus.type === 'success'
+                    ? 'border-green-100 bg-green-50 text-green-700'
+                    : 'border-red-100 bg-red-50 text-red-700'
+                }`}
+              >
+                {resetPasswordStatus.message}
+              </p>
+            )}
+
             <div>
               <p className="text-sm text-slate-600 mb-1">Two-Factor Authentication</p>
               <p className="text-xs text-slate-500">Add an extra layer of security.</p>
