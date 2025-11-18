@@ -810,18 +810,21 @@ export default function B2CElderPage() {
     // Update priorities in database
     try {
       // Update all priorities sequentially (1, 2, 3, etc.)
-      const updates = updatedContacts.map((contact, index) => {
-        const assignmentId = contact.elder_assignments?.[0]?.id
-        if (!assignmentId) return null
+      const updates = updatedContacts
+        .map((contact, index) => {
+          const assignmentId = contact.elder_assignments?.[0]?.id
+          if (!assignmentId) return null
 
-        return supabase
-          .from('elder_emergency_contact')
-          .update({ "priority order": index + 1 })
-          .eq('id', assignmentId)
-      }).filter(Boolean)
+          return supabase
+            .from('elder_emergency_contact')
+            .update({ "priority order": index + 1 })
+            .eq('id', assignmentId)
+            .then(() => null) // Convert to Promise
+        })
+        .filter((update): update is Promise<null> => update !== null)
 
       // Execute all updates
-      await Promise.all(updates as Promise<any>[])
+      await Promise.all(updates)
     } catch (err) {
       console.error('Error updating priorities:', err)
       // Revert on error

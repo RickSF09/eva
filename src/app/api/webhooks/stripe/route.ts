@@ -18,9 +18,9 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
   const primaryItem = subscription.items.data.at(0)
 
-  const currentPeriodEnd = subscription.current_period_end
-    ? new Date(subscription.current_period_end * 1000).toISOString()
-    : null
+  // Access properties using type assertion to avoid TypeScript type issues
+  const currentPeriodEnd = (subscription as any).current_period_end as number | undefined
+  const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
 
   const { error } = await supabaseAdmin
     .from('users')
@@ -28,8 +28,10 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
       subscription_plan: primaryItem?.price.nickname ?? primaryItem?.price.id ?? null,
-      subscription_current_period_end: currentPeriodEnd,
-      subscription_cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      subscription_current_period_end: currentPeriodEnd
+        ? new Date(currentPeriodEnd * 1000).toISOString()
+        : null,
+      subscription_cancel_at_period_end: cancelAtPeriodEnd ?? false,
     })
     .eq('stripe_customer_id', customerId)
 
@@ -42,13 +44,16 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
 
+  // Access properties using type assertion to avoid TypeScript type issues
+  const endedAt = (subscription as any).ended_at as number | undefined
+
   const { error } = await supabaseAdmin
     .from('users')
     .update({
       subscription_status: 'canceled',
       subscription_cancel_at_period_end: false,
-      subscription_current_period_end: subscription.ended_at
-        ? new Date(subscription.ended_at * 1000).toISOString()
+      subscription_current_period_end: endedAt
+        ? new Date(endedAt * 1000).toISOString()
         : null,
     })
     .eq('stripe_customer_id', customerId)

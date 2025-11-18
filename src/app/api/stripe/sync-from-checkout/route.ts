@@ -74,12 +74,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const subscription =
-      typeof session.subscription === 'string'
-        ? await stripe.subscriptions.retrieve(subscriptionId)
-        : session.subscription
+    // Always retrieve the full subscription object to ensure all properties are available
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+
+    if (!subscription) {
+      return NextResponse.json(
+        { error: 'Unable to retrieve subscription' },
+        { status: 404 }
+      )
+    }
 
     const primaryItem = subscription.items.data.at(0)
+    
+    // Access properties using bracket notation to avoid TypeScript type issues
+    const currentPeriodEnd = (subscription as any).current_period_end as number | undefined
+    const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
 
     const { error: updateError } = await supabase
       .from('users')
@@ -87,10 +96,10 @@ export async function POST(req: NextRequest) {
         stripe_subscription_id: subscription.id,
         subscription_status: subscription.status,
         subscription_plan: primaryItem?.price.nickname ?? primaryItem?.price.id ?? null,
-        subscription_current_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        subscription_current_period_end: currentPeriodEnd
+          ? new Date(currentPeriodEnd * 1000).toISOString()
           : null,
-        subscription_cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+        subscription_cancel_at_period_end: cancelAtPeriodEnd ?? false,
       })
       .eq('id', profile.id)
 
@@ -106,10 +115,10 @@ export async function POST(req: NextRequest) {
         id: subscription.id,
         status: subscription.status,
         plan: primaryItem?.price.nickname ?? primaryItem?.price.id ?? null,
-        currentPeriodEnd: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        currentPeriodEnd: currentPeriodEnd
+          ? new Date(currentPeriodEnd * 1000).toISOString()
           : null,
-        cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+        cancelAtPeriodEnd: cancelAtPeriodEnd ?? false,
       },
     })
   } catch (err) {
