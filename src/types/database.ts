@@ -1055,6 +1055,7 @@ export type Database = {
           twilio_cost_usd: number | null
           vapi_call_id: string | null
           vapi_cost_pence: number | null
+          recording_storage_path: string | null
         }
         Insert: {
           agenda_completion?: Json | null
@@ -1072,6 +1073,7 @@ export type Database = {
           id?: string
           mood_assessment?: string | null
           recording_url?: string | null
+          recording_storage_path?: string | null
           sentiment_score?: number | null
           summary?: string | null
           tone_analysis?: string | null
@@ -1096,6 +1098,7 @@ export type Database = {
           id?: string
           mood_assessment?: string | null
           recording_url?: string | null
+          recording_storage_path?: string | null
           sentiment_score?: number | null
           summary?: string | null
           tone_analysis?: string | null

@@ -38,6 +38,7 @@ interface CallReport {
   tone_analysis: string | null
   transcript: string | null
   recording_url: string | null
+  recording_storage_path: string | null
   execution_id?: string
   health_indicators?: any
   agenda_completion?: any
@@ -97,7 +98,7 @@ export default function B2CHomePage() {
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
           const { data: reports } = await supabase
             .from('post_call_reports')
-            .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, execution_id, health_indicators, agenda_completion, elder_id')
+            .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id')
             .eq('elder_id', elderRecord.id)
             .gte('call_started_at', thirtyDaysAgo)
             .order('call_started_at', { ascending: false })

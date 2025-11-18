@@ -1,9 +1,11 @@
 'use client'
 
 import { formatDateTime, formatDuration } from '@/lib/utils'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Phone, AlertTriangle, ArrowRight, CheckCircle, XCircle, User, ChevronDown } from 'lucide-react'
+import { Phone, AlertTriangle, ArrowRight, CheckCircle, XCircle, User, ChevronDown, Play, Loader2 } from 'lucide-react'
+
+const RECORDING_URL_TTL_SECONDS = 60 * 60 * 2 // 2 hours
 
 interface CallReportModalProps {
   report: {
@@ -21,6 +23,7 @@ interface CallReportModalProps {
     sentiment_score: number | null
     agenda_completion?: any
     recording_url?: string | null
+    recording_storage_path?: string | null
     execution_id?: string
     health_indicators?: any
     elder_id?: string
@@ -37,6 +40,20 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
   }>({})
   const [healthOpen, setHealthOpen] = useState(false)
   const [elderName, setElderName] = useState<string>('User')
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null)
+  const [recordingLoading, setRecordingLoading] = useState(false)
+  const [recordingError, setRecordingError] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const healthIndicators =
+    report.health_indicators && typeof report.health_indicators === 'object'
+      ? report.health_indicators
+      : undefined
+
+  const hasIndicatorSection = (section?: Record<string, unknown> | null) => {
+    if (!section || typeof section !== 'object') return false
+    return Object.values(section).some(value => value !== null && value !== undefined)
+  }
 
   // Normalize mood value in 0..1 for consistent display
   const moodValue = (() => {
@@ -71,6 +88,89 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
       void loadEscalationFlow()
     }
   }, [report.id])
+
+  useEffect(() => {
+    setRecordingUrl(null)
+    setRecordingError(null)
+    setRecordingLoading(false)
+  }, [report.id])
+
+  useEffect(() => {
+    if (!recordingUrl) return
+    const audio = audioRef.current
+    if (!audio) return
+
+    const play = async () => {
+      try {
+        await audio.play()
+      } catch {
+        // Autoplay might be blocked; user can press play manually.
+      }
+    }
+
+    play()
+  }, [recordingUrl])
+
+  const handleLoadRecording = async () => {
+    if (recordingLoading) return
+
+    if (recordingUrl) {
+      const audio = audioRef.current
+      if (audio?.paused) {
+        try {
+          await audio.play()
+        } catch {
+          // Autoplay might be blocked.
+        }
+      }
+      return
+    }
+
+    const hasStoragePath = !!report.recording_storage_path
+    const hasLegacyUrl = !!report.recording_url
+
+    if (!hasStoragePath && !hasLegacyUrl) {
+      setRecordingError('No recording available for this call.')
+      return
+    }
+
+    try {
+      setRecordingLoading(true)
+      setRecordingError(null)
+
+      let url: string | null = null
+
+      if (hasStoragePath) {
+        // Remove 'recordings/' prefix if present, since .from('recordings') already specifies the bucket
+        let storagePath = report.recording_storage_path!
+
+        if (storagePath.startsWith('recordings/')) {
+          storagePath = storagePath.substring('recordings/'.length)
+        }
+
+        const { data, error } = await supabase.storage
+          .from('recordings')
+          .createSignedUrl(storagePath, RECORDING_URL_TTL_SECONDS)
+
+        if (error) throw error
+
+        url = data?.signedUrl ?? null
+      } else {
+        url = report.recording_url ?? null
+      }
+
+      if (!url) {
+        throw new Error('Missing recording URL')
+      }
+
+      setRecordingUrl(url)
+    } catch (error) {
+      console.error('Failed to load recording', error)
+      setRecordingError('Unable to load recording right now. Please try again.')
+    } finally {
+      setRecordingLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (report.elder_id) {
@@ -170,39 +270,45 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
             <p className="text-sm text-gray-800 whitespace-pre-wrap">{report.summary || 'No summary available'}</p>
           </section>
 
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-xs text-gray-500 font-medium">Mood</div>
-              <div className="mt-2">
-                <div className="h-2 rounded bg-gray-200 overflow-hidden">
-                  <div className={`h-full ${moodColor.bar}`} style={{ width: `${(moodValue ?? 0) * 100}%` }} />
+          {(moodValue !== null || toneValue !== null) && (
+            <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {moodValue !== null && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="text-xs text-gray-500 font-medium">Mood</div>
+                  <div className="mt-2">
+                    <div className="h-2 rounded bg-gray-200 overflow-hidden">
+                      <div className={`h-full ${moodColor.bar}`} style={{ width: `${moodValue * 100}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[11px] text-gray-500 mt-1">
+                      <span>Low</span>
+                      <span>High</span>
+                    </div>
+                  </div>
+                  {report.mood_assessment && typeof moodValue !== 'number' && (
+                    <div className="mt-2 text-sm text-gray-900">{report.mood_assessment}</div>
+                  )}
                 </div>
-                <div className="flex justify-between text-[11px] text-gray-500 mt-1">
-                  <span>Low</span>
-                  <span>High</span>
-                </div>
-              </div>
-              {report.mood_assessment && typeof moodValue !== 'number' && (
-                <div className="mt-2 text-sm text-gray-900">{report.mood_assessment}</div>
               )}
-            </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-xs text-gray-500 font-medium">Tone</div>
-              <div className="mt-2">
-                <div className="h-2 rounded bg-gray-200 overflow-hidden">
-                  <div className={`h-full ${toneColor.bar}`} style={{ width: `${(toneValue ?? 0.5) * 100}%` }} />
+              {toneValue !== null && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="text-xs text-gray-500 font-medium">Tone</div>
+                  <div className="mt-2">
+                    <div className="h-2 rounded bg-gray-200 overflow-hidden">
+                      <div className={`h-full ${toneColor.bar}`} style={{ width: `${toneValue * 100}%` }} />
+                    </div>
+                    <div className="flex justify-between text-[11px] text-gray-500 mt-1">
+                      <span>Low</span>
+                      <span>High</span>
+                    </div>
+                  </div>
+                  {report.tone_analysis && typeof toneValue !== 'number' && (
+                    <div className="mt-2 text-sm text-gray-900">{report.tone_analysis}</div>
+                  )}
                 </div>
-                <div className="flex justify-between text-[11px] text-gray-500 mt-1">
-                  <span>Low</span>
-                  <span>High</span>
-                </div>
-              </div>
-              {report.tone_analysis && typeof toneValue !== 'number' && (
-                <div className="mt-2 text-sm text-gray-900">{report.tone_analysis}</div>
               )}
-            </div>
-          </section>
+            </section>
+          )}
 
           
 
@@ -281,10 +387,40 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
             </section>
           )}
 
-          {report.recording_url && (
-            <section>
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">Recording</h3>
-              <a href={report.recording_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">Open call recording in new tab</a>
+          {(report.recording_storage_path || report.recording_url) && (
+            <section className="border border-gray-200 rounded-2xl p-4 bg-white">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Recording</h3>
+              <div className="space-y-3">
+                {recordingUrl ? (
+                  <div className="rounded-xl border border-gray-200 overflow-hidden bg-white p-2">
+                    <audio
+                      ref={audioRef}
+                      controls
+                      src={recordingUrl}
+                      className="block w-full h-16 min-h-[4rem]"
+                    >
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleLoadRecording}
+                    disabled={recordingLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:bg-indigo-500 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    {recordingLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4" />
+                        Play recording
+                      </>
+                    )}
+                  </button>
+                )}
+                {recordingError && <p className="text-sm text-red-600">{recordingError}</p>}
+              </div>
             </section>
           )}
 
@@ -375,7 +511,7 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
             </div>
           </section>
 
-          {report.health_indicators && (
+          {healthIndicators && (
             <section>
               <button
                 type="button"
@@ -388,11 +524,11 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
               {healthOpen && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Mental Health */}
-                  {'mental_health' in (report.health_indicators || {}) && (
+                  {hasIndicatorSection(healthIndicators?.mental_health) && (
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="text-xs text-gray-500 font-medium mb-2">Mental Health</div>
                       <div className="space-y-1 text-sm">
-                        {Object.entries(report.health_indicators.mental_health || {})
+                        {Object.entries(healthIndicators?.mental_health ?? {})
                           .filter(([_, v]) => v !== null)
                           .map(([k, v]) => (
                             <div key={`mh-${k}`} className="flex items-center justify-between">
@@ -407,11 +543,11 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
                   )}
 
                   {/* Physical Health */}
-                  {'physical_health' in (report.health_indicators || {}) && (
+                  {hasIndicatorSection(healthIndicators?.physical_health) && (
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="text-xs text-gray-500 font-medium mb-2">Physical Health</div>
                       <div className="space-y-1 text-sm">
-                        {Object.entries(report.health_indicators.physical_health || {})
+                        {Object.entries(healthIndicators?.physical_health ?? {})
                           .filter(([_, v]) => v !== null)
                           .map(([k, v]) => (
                             <div key={`ph-${k}`} className="flex items-center justify-between">
@@ -426,11 +562,11 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
                   )}
 
                   {/* Social Environment */}
-                  {'social_environment' in (report.health_indicators || {}) && (
+                  {hasIndicatorSection(healthIndicators?.social_environment) && (
                     <div className="bg-gray-50 p-4 rounded-lg">
                       <div className="text-xs text-gray-500 font-medium mb-2">Social Environment</div>
                       <div className="space-y-1 text-sm">
-                        {Object.entries(report.health_indicators.social_environment || {})
+                        {Object.entries(healthIndicators?.social_environment ?? {})
                           .filter(([_, v]) => v !== null)
                           .map(([k, v]) => (
                             <div key={`se-${k}`} className="flex items-center justify-between">
