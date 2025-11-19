@@ -417,19 +417,36 @@ export default function B2CSettingsPage() {
                   {emailPrefs.to_emails && Array.isArray(emailPrefs.to_emails) && emailPrefs.to_emails.length > 0 && (
                     <div className="flex flex-col gap-2">
                       {emailPrefs.to_emails.map((email, index) => (
-                        <div key={index} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                          <span className="flex-1 text-sm text-slate-900">{email}</span>
+                        <div 
+                          key={index} 
+                          className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                          onClick={(e) => {
+                            // Prevent any clicks on the container from doing anything
+                            // Only the button should handle removal
+                            const target = e.target as HTMLElement
+                            const button = target.closest('button[type="button"]')
+                            // If click is NOT on the button, prevent and stop
+                            if (!button) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }
+                          }}
+                        >
+                          <span className="flex-1 text-sm text-slate-900 select-none">{email}</span>
                           <button
                             type="button"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
                               setEmailPrefs(prev => ({
                                 ...prev,
                                 to_emails: (prev.to_emails || []).filter((_, i) => i !== index)
                               }))
                               setEmailPrefsMessage(null)
                             }}
-                            className="text-red-600 hover:text-red-700"
+                            className="text-red-600 hover:text-red-700 flex-shrink-0 cursor-pointer"
                             disabled={loading || savingEmailPrefs}
+                            aria-label={`Remove ${email}`}
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
