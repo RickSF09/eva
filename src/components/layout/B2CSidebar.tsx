@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -10,17 +11,71 @@ import {
   Heart
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
+import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
-const navigation = [
+const baseNavigation = [
   { name: 'Home', href: '/app/home', icon: Home },
-  { name: 'My Elder', href: '/app/elder', icon: User },
+  { name: 'Profile', href: '/app/elder', icon: User },
   { name: 'Settings', href: '/app/settings', icon: Settings },
 ]
 
 export function B2CSidebar() {
   const pathname = usePathname()
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
+  const [elderFirstName, setElderFirstName] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user) return
+
+    let active = true
+
+    const fetchElderName = async () => {
+      try {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('id')
+          .eq('auth_user_id', user.id)
+          .single()
+
+        if (!active || !profile) return
+
+        const { data: elder } = await supabase
+          .from('elders')
+          .select('first_name')
+          .eq('user_id', profile.id)
+          .single()
+
+        if (!active) return
+
+        if (elder?.first_name) {
+          setElderFirstName(elder.first_name.trim())
+        } else {
+          setElderFirstName(null)
+        }
+      } catch (error) {
+        console.error('Failed to fetch elder name:', error)
+        setElderFirstName(null)
+      }
+    }
+
+    fetchElderName()
+
+    return () => {
+      active = false
+    }
+  }, [user])
+
+  // Build navigation with dynamic name
+  const navigation = baseNavigation.map((item) => {
+    if (item.href === '/app/elder') {
+      return {
+        ...item,
+        name: elderFirstName ? `${elderFirstName}'s Profile` : 'Profile'
+      }
+    }
+    return item
+  })
 
   return (
     <div className="flex flex-col w-64 bg-white border-r border-slate-200 h-screen">
@@ -45,7 +100,7 @@ export function B2CSidebar() {
           const isActive = pathname === item.href
           return (
             <Link
-              key={item.name}
+              key={item.href}
               href={item.href}
               className={cn(
                 "flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-colors",

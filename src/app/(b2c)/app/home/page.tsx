@@ -154,7 +154,7 @@ export default function B2CHomePage() {
             {!elder && (
               <p className="mt-1 text-sm text-slate-600">
                 <Link href="/app/elder" className="text-slate-900 underline hover:text-slate-700">
-                  Add elder details
+                  Add profile details
                 </Link>
               </p>
             )}

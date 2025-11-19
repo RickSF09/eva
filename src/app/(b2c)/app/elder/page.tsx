@@ -289,6 +289,11 @@ export default function B2CElderPage() {
     }
   }
 
+  // Helper to get display name
+  const getDisplayName = () => {
+    return form.first_name.trim() || 'Profile'
+  }
+
   const handleFieldChange = (field: Exclude<keyof ElderFormState, 'phone'>) =>
     (event: FormEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const target = event.target as HTMLInputElement | HTMLTextAreaElement
@@ -376,7 +381,7 @@ export default function B2CElderPage() {
         setElderId(data.id)
         setFeedback({
           type: 'success',
-          message: 'Elder created successfully. Next, set up their call schedule below.',
+          message: `${form.first_name.trim() || 'Profile'} created successfully. Next, set up their call schedule below.`,
         })
         fetchSchedules(data.id)
       }
@@ -486,7 +491,7 @@ export default function B2CElderPage() {
   const handleCreateSchedule = async (event: FormEvent) => {
     event.preventDefault()
     if (!elderId) {
-      setScheduleError('Save elder details before creating a schedule.')
+      setScheduleError(`Save ${getDisplayName()}'s details before creating a schedule.`)
       return
     }
 
@@ -973,7 +978,6 @@ export default function B2CElderPage() {
     })
   )
 
-
   if (loading) {
     return (
       <div className="space-y-4">
@@ -988,9 +992,9 @@ export default function B2CElderPage() {
   return (
     <div className="space-y-6">
       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-        <h1 className="text-xl font-semibold text-slate-900">Elder Information</h1>
+        <h1 className="text-xl font-semibold text-slate-900">{form.first_name.trim() ? `${form.first_name}'s Information` : 'Profile Information'}</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Add details about your loved one so our team can personalise check-ins and respond quickly during emergencies.
+          Add details about {getDisplayName()} so our team can personalise check-ins and respond quickly during emergencies.
         </p>
       </div>
 
@@ -1127,7 +1131,7 @@ export default function B2CElderPage() {
         {!elderId && (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <AlertCircle className="h-5 w-5 flex-none text-slate-500" />
-            Save the elder details first, then you can add schedules.
+            Save {getDisplayName()}'s details first, then you can add schedules.
           </div>
         )}
 
@@ -1473,7 +1477,7 @@ export default function B2CElderPage() {
         {!elderId && (
           <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <AlertCircle className="h-5 w-5 flex-none text-slate-500" />
-            Save the elder details first, then you can add emergency contacts.
+            Save {getDisplayName()}'s details first, then you can add emergency contacts.
           </div>
         )}
 
