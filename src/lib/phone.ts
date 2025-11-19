@@ -41,6 +41,12 @@ export function getNationalNumber(e164: string, countryCode: SupportedCountryCod
  *   - +31 (Netherlands): 9 digits → total length 12
  *   - +44 (UK): 10 digits → total length 13
  */
+function formatNumberList(values: number[]): string {
+  if (values.length === 1) return `${values[0]}`
+  if (values.length === 2) return `${values[0]} or ${values[1]}`
+  return `${values.slice(0, -1).join(', ')} or ${values[values.length - 1]}`
+}
+
 export function validateE164(fullNumber: string, expectedCode?: SupportedCountryCode): string | null {
   if (!fullNumber) return 'Phone number is required'
 
@@ -58,10 +64,10 @@ export function validateE164(fullNumber: string, expectedCode?: SupportedCountry
   const code = expectedCode || detectCountryCodeFromE164(cleaned)
   
   // Country-specific validation
-  const rules: Record<SupportedCountryCode, { length: number; digits: number }> = {
-    '+1': { length: 12, digits: 10 },   // +1 2125551234
-    '+31': { length: 12, digits: 9 },   // +31 612345678
-    '+44': { length: 13, digits: 10 },  // +44 7123456789
+  const rules: Record<SupportedCountryCode, { digits: number[] }> = {
+    '+1': { digits: [10] },           // +1 2125551234
+    '+31': { digits: [9, 11] },       // +31 612345678 or +3197012345678 (M2M)
+    '+44': { digits: [10] },          // +44 7123456789
   }
 
   const rule = rules[code]
@@ -69,8 +75,11 @@ export function validateE164(fullNumber: string, expectedCode?: SupportedCountry
     return 'Unsupported country code'
   }
 
-  if (cleaned.length !== rule.length) {
-    return `Enter ${rule.digits} digits after ${code} (total ${rule.length} characters including ${code})`
+  const totalLengths = rule.digits.map((digits) => code.length + digits)
+  if (!totalLengths.includes(cleaned.length)) {
+    const digitsText = formatNumberList(rule.digits)
+    const lengthText = formatNumberList(totalLengths)
+    return `Enter ${digitsText} digits after ${code} (total ${lengthText} characters including ${code})`
   }
 
   // Verify all characters after the + are digits
@@ -81,8 +90,9 @@ export function validateE164(fullNumber: string, expectedCode?: SupportedCountry
 
   // Verify the national number part has correct digits
   const nationalPart = cleaned.slice(code.length)
-  if (nationalPart.length !== rule.digits) {
-    return `Enter exactly ${rule.digits} digits after ${code}`
+  if (!rule.digits.includes(nationalPart.length)) {
+    const digitsText = formatNumberList(rule.digits)
+    return `Enter exactly ${digitsText} digits after ${code}`
   }
 
   return null

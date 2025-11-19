@@ -40,9 +40,18 @@ interface EmergencyContactFormProps {
   onAssignElders?: () => void
   isB2C?: boolean
   elderId?: string | null
+  variant?: 'modal' | 'inline'
 }
 
-export function EmergencyContactForm({ contact, onCancel, onSave, onAssignElders, isB2C = false, elderId = null }: EmergencyContactFormProps) {
+export function EmergencyContactForm({
+  contact,
+  onCancel,
+  onSave,
+  onAssignElders,
+  isB2C = false,
+  elderId = null,
+  variant = 'modal',
+}: EmergencyContactFormProps) {
   const { currentOrg } = useOrganizations()
   const [formData, setFormData] = useState<EmergencyContact>({
     name: contact?.name || '',
@@ -259,26 +268,41 @@ export function EmergencyContactForm({ contact, onCancel, onSave, onAssignElders
   const hoverClass = isB2C ? 'hover:bg-slate-100' : 'hover:bg-gray-100'
   const buttonClass = isB2C ? 'bg-slate-900 hover:bg-slate-700' : 'bg-blue-600 hover:bg-blue-700'
   const inputClass = isB2C ? 'border-slate-200 focus:ring-slate-200 focus:border-slate-400' : 'border-gray-200 focus:ring-blue-500 focus:border-transparent'
+  const isInline = variant === 'inline'
+  const containerClass = isInline
+    ? `rounded-xl border ${isB2C ? 'border-slate-200 bg-slate-50' : 'border-gray-200 bg-white'}`
+    : 'bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden'
+  const headerPadding = isInline ? 'px-4 py-3' : 'p-6'
+  const formClassName = isInline ? 'px-4 py-4' : 'p-6 overflow-y-auto max-h-[calc(90vh-140px)]'
 
-  return (
-    <div className="fixed inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className={`flex items-center justify-between p-6 border-b ${headerClass}`}>
-          <h2 className={`text-xl font-semibold ${textClass}`}>
-            {contact ? 'Edit Emergency Contact' : 'Add Emergency Contact'}
-          </h2>
-          <button
-            onClick={onCancel}
-            className={`p-2 ${hoverClass} rounded-lg transition-colors`}
-          >
-            <X className={`w-5 h-5 ${isB2C ? 'text-slate-500' : 'text-gray-500'}`} />
-          </button>
-        </div>
+  const header = (
+    <div className={`flex items-center justify-between ${headerPadding} border-b ${headerClass}`}>
+      <h2 className={`${isInline ? 'text-lg' : 'text-xl'} font-semibold ${textClass}`}>
+        {contact ? 'Edit Emergency Contact' : 'Add Emergency Contact'}
+      </h2>
+      {isInline ? (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="inline-flex items-center gap-1 rounded-lg px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-200 transition"
+        >
+          <X className="h-3 w-3" />
+          Cancel
+        </button>
+      ) : (
+        <button
+          onClick={onCancel}
+          className={`p-2 ${hoverClass} rounded-lg transition-colors`}
+        >
+          <X className={`w-5 h-5 ${isB2C ? 'text-slate-500' : 'text-gray-500'}`} />
+        </button>
+      )}
+    </div>
+  )
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          <div className="space-y-6">
+  const form = (
+    <form onSubmit={handleSubmit} className={formClassName}>
+      <div className="space-y-6">
             {/* Basic Information */}
             <div>
               <h3 className={`text-lg font-medium ${textClass} mb-4 flex items-center`}>
@@ -315,23 +339,21 @@ export function EmergencyContactForm({ contact, onCancel, onSave, onAssignElders
                   <label className={`block text-sm font-medium ${isB2C ? 'text-slate-700' : 'text-gray-700'} mb-2`}>
                     Phone Number *
                   </label>
-                  <div className="flex">
-                    <div className="flex-shrink-0">
-                      <select 
-                        className={`px-3 py-2 border rounded-l-lg focus:ring-2 ${inputClass} ${textClass} ${isB2C ? 'bg-slate-50' : 'bg-gray-50'}`}
-                        value={countryCode}
-                        onChange={handleCountryChange}
-                      >
-                        <option value="+1">🇺🇸 +1</option>
-                        <option value="+31">🇳🇱 +31</option>
-                        <option value="+44">🇬🇧 +44</option>
-                      </select>
-                    </div>
+                  <div className={`flex rounded-lg border ${isB2C ? 'border-slate-200 focus-within:ring-2 focus-within:ring-slate-200' : 'border-gray-200 focus-within:ring-2 focus-within:ring-blue-500'}`}>
+                    <select 
+                      value={countryCode}
+                      onChange={handleCountryChange}
+                      className={`rounded-l-lg border-0 border-r ${isB2C ? 'border-slate-200 bg-slate-50 text-slate-900 focus:border-slate-300' : 'border-gray-200 bg-gray-50 text-gray-900 focus:border-gray-300'} px-3 py-2 text-sm focus:outline-none`}
+                    >
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+31">🇳🇱 +31</option>
+                      <option value="+44">🇬🇧 +44</option>
+                    </select>
                     <input
                       type="tel"
-                      value={formData.phone.replace(new RegExp(`^\\${countryCode}`), '')}
+                      value={formData.phone.startsWith(countryCode) ? formData.phone.slice(countryCode.length) : formData.phone}
                       onChange={handlePhoneChange}
-                      className={`flex-1 px-3 py-2 border border-l-0 rounded-r-lg focus:ring-2 ${inputClass} ${textClass} ${isB2C ? 'placeholder-slate-500' : 'placeholder-gray-500'}`}
+                      className={`flex-1 rounded-r-lg border-0 px-3 py-2 ${textClass} focus:outline-none ${isB2C ? 'placeholder-slate-500' : 'placeholder-gray-500'}`}
                       placeholder={countryCode === '+1' ? '5551234567' : countryCode === '+31' ? '612345678' : '729959925'}
                       required
                     />
@@ -415,42 +437,58 @@ export function EmergencyContactForm({ contact, onCancel, onSave, onAssignElders
             </div>
           </div>
 
-          {error && (
-            <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-red-600 text-sm">{error}</p>
-            </div>
-          )}
+        {error && (
+          <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
 
-          {/* Actions */}
-          <div className={`flex justify-end space-x-3 mt-8 pt-6 border-t ${borderClass}`}>
-            {contact && onAssignElders && !isB2C && (
-              <button
-                type="button"
-                onClick={onAssignElders}
-                className={`px-4 py-2 ${isB2C ? 'text-slate-700 bg-slate-100 hover:bg-slate-200' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition-colors flex items-center`}
-              >
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-                Assign Clients
-              </button>
-            )}
+        {/* Actions */}
+        <div className={`flex justify-end space-x-3 mt-8 pt-6 border-t ${borderClass}`}>
+          {contact && onAssignElders && !isB2C && (
             <button
               type="button"
-              onClick={onCancel}
-              className={`px-4 py-2 ${isB2C ? 'text-slate-700 bg-slate-100 hover:bg-slate-200' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition-colors`}
+              onClick={onAssignElders}
+              className={`px-4 py-2 ${isB2C ? 'text-slate-700 bg-slate-100 hover:bg-slate-200' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition-colors flex items-center`}
             >
-              Cancel
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+              </svg>
+              Assign Clients
             </button>
-            <button
-              type="submit"
-              disabled={loading || !!phoneError}
-              className={`px-4 py-2 ${buttonClass} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
-            >
-              {loading ? 'Saving...' : contact ? 'Update Contact' : 'Add Contact'}
-            </button>
-          </div>
-        </form>
+          )}
+          <button
+            type="button"
+            onClick={onCancel}
+            className={`px-4 py-2 ${isB2C ? 'text-slate-700 bg-slate-100 hover:bg-slate-200' : 'text-gray-700 bg-gray-100 hover:bg-gray-200'} rounded-lg transition-colors`}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !!phoneError}
+            className={`px-4 py-2 ${buttonClass} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
+          >
+            {loading ? 'Saving...' : contact ? 'Update Contact' : 'Add Contact'}
+          </button>
+        </div>
+    </form>
+  )
+
+  if (isInline) {
+    return (
+      <div className={containerClass}>
+        {header}
+        {form}
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/10 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className={containerClass}>
+        {header}
+        {form}
       </div>
     </div>
   )

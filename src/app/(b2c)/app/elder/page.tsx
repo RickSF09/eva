@@ -76,6 +76,7 @@ interface EmergencyContact {
   created_at: string
   updated_at: string
   elder_assignments?: ElderAssignment[]
+  relation?: string
 }
 
 interface ElderAssignment {
@@ -118,6 +119,17 @@ const DAYS_OF_WEEK = [
   { value: 6, label: 'Sat' },
 ]
 
+const COMMON_CHECKLIST_ITEMS = [
+  'Taken medication',
+  'Feeling well',
+  'Eaten today',
+  'Had water',
+  'Moved around',
+  'Feeling safe',
+  'No pain',
+  'Sleeping well',
+]
+
 export default function B2CElderPage() {
   const { user } = useAuth()
   const router = useRouter()
@@ -135,7 +147,7 @@ export default function B2CElderPage() {
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [phoneError, setPhoneError] = useState<string | null>(null)
-  const [countryCode, setCountryCode] = useState<SupportedCountryCode>('+1')
+  const [countryCode, setCountryCode] = useState<SupportedCountryCode>('+44')
 
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(DEFAULT_SCHEDULE)
   const [scheduleSaving, setScheduleSaving] = useState(false)
@@ -204,7 +216,7 @@ export default function B2CElderPage() {
         } else {
           setElderId(null)
           setForm(DEFAULT_ELDER)
-          setCountryCode('+1')
+          setCountryCode('+44')
           setPhoneError(null)
           setSchedules([])
           setEmergencyContacts([])
@@ -410,6 +422,17 @@ export default function B2CElderPage() {
 
   const addScheduleTopic = () => {
     setScheduleForm((prev) => ({ ...prev, topics: [...prev.topics, ''] }))
+  }
+
+  const addQuickChecklistItem = (item: string) => {
+    setScheduleForm((prev) => {
+      // Don't add if it already exists (case-insensitive)
+      const alreadyExists = prev.topics.some(
+        (topic) => topic.trim().toLowerCase() === item.trim().toLowerCase()
+      )
+      if (alreadyExists) return prev
+      return { ...prev, topics: [...prev.topics, item] }
+    })
   }
 
   const removeScheduleTopic = (index: number) => {
@@ -745,6 +768,7 @@ export default function B2CElderPage() {
 
   const handleEditEmergencyContact = (contact: EmergencyContact) => {
     setEditingEmergencyContact(contact)
+    setShowAddEmergencyContact(false)
   }
 
   const handleDeleteEmergencyContact = async (contactId: string) => {
@@ -849,14 +873,15 @@ export default function B2CElderPage() {
       transition,
       opacity: isDragging ? 0.5 : 1,
     }
+    const isEditingThisContact = editingEmergencyContact?.id === contact.id
 
     return (
       <div
         ref={setNodeRef}
         style={style}
-        className={`rounded-lg border border-slate-200 p-4 hover:shadow-md transition-shadow ${
+        className={`rounded-lg border p-4 hover:shadow-md transition-shadow ${
           isDragging ? 'shadow-lg' : ''
-        }`}
+        } ${isEditingThisContact ? 'border-slate-400 bg-slate-50' : 'border-slate-200 bg-white'}`}
       >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center flex-1 min-w-0">
@@ -929,6 +954,13 @@ export default function B2CElderPage() {
             {contact.active ? 'Active' : 'Inactive'}
           </span>
         </div>
+
+        {isEditingThisContact && (
+          <div className="mt-3 flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700">
+            <AlertCircle className="h-4 w-4 flex-none text-slate-500" />
+            <span>Editing this contact. Make changes below and save.</span>
+          </div>
+        )}
       </div>
     )
   }
@@ -1235,12 +1267,13 @@ export default function B2CElderPage() {
                       key={day.value}
                       type="button"
                       onClick={() => toggleScheduleDay(day.value)}
-                      className={`rounded-lg border px-3 py-1 text-sm transition ${
+                      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-all ${
                         selected
-                          ? 'border-slate-600 bg-slate-900 text-white'
-                          : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          ? 'border-blue-500 bg-blue-600 text-white shadow-sm ring-2 ring-blue-200'
+                          : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
                       }`}
                     >
+                      {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
                       {day.label}
                     </button>
                   )
@@ -1282,17 +1315,20 @@ export default function B2CElderPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700">Topics for the AI to cover</p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-slate-700">Checklist items</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Add specific items for Eva to verify during the call. She'll ask about each one and track completion in the call report.
+                  </p>
+                </div>
+
+                {/* Current checklist items */}
                 <div className="space-y-2">
                   {scheduleForm.topics.length === 0 ? (
-                    <button
-                      type="button"
-                      onClick={addScheduleTopic}
-                      className="w-full rounded-lg border border-dashed border-slate-300 px-4 py-3 text-center text-sm text-slate-500 hover:border-slate-400 hover:bg-slate-50 hover:text-slate-700 transition-colors cursor-pointer"
-                    >
-                      No topics added yet. Click here to add topics.
-                    </button>
+                    <div className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-center text-sm text-slate-500">
+                      No items added yet. Add a custom item below or use the quick-add options.
+                    </div>
                   ) : (
                     scheduleForm.topics.map((topic, index) => (
                       <div key={index} className="flex items-center gap-2">
@@ -1307,7 +1343,7 @@ export default function B2CElderPage() {
                           type="button"
                           onClick={() => removeScheduleTopic(index)}
                           className="rounded-lg p-2 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition"
-                          title="Remove topic"
+                          title="Remove item"
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1315,15 +1351,44 @@ export default function B2CElderPage() {
                     ))
                   )}
                 </div>
-                {scheduleForm.topics.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={addScheduleTopic}
-                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
-                  >
-                    + Add topic
-                  </button>
-                )}
+
+                {/* Add custom item button */}
+                <button
+                  type="button"
+                  onClick={addScheduleTopic}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                >
+                  + Add custom item
+                </button>
+
+                {/* Quick-add suggestions */}
+                <div>
+                  <p className="text-xs font-medium text-slate-600 mb-2">Quick add:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {COMMON_CHECKLIST_ITEMS.map((item) => {
+                      const isAdded = scheduleForm.topics.some(
+                        (topic) => topic.trim().toLowerCase() === item.trim().toLowerCase()
+                      )
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => addQuickChecklistItem(item)}
+                          disabled={isAdded}
+                          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
+                            isAdded
+                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 cursor-default'
+                              : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
+                        >
+                          {isAdded && <CheckCircle2 className="h-3 w-3" />}
+                          {item}
+                          {!isAdded && <span className="text-slate-400">+</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -1357,14 +1422,14 @@ export default function B2CElderPage() {
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-medium text-slate-700">Description</p>
+                <p className="text-sm font-medium text-slate-700">Call guidance</p>
                 <p className="text-xs text-slate-500">
-                  Provide context for the AI to steer the call. Describe the purpose, tone, or specific focus areas for this schedule.
+                  Provide context for Eva to steer the call. Describe the purpose, tone, or specific focus areas for this schedule.
                 </p>
                 <textarea
                   value={scheduleForm.description}
                   onChange={(event) => updateScheduleForm({ description: event.target.value })}
-                  placeholder="e.g. A gentle morning check-in focusing on medication adherence and overall wellbeing. Keep the conversation warm and supportive, and ask about any concerns or needs."
+                  placeholder="A gentle morning check-in focusing on medication adherence and overall wellbeing. Keep the conversation warm and supportive, and ask about any concerns or needs."
                   rows={3}
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                   required
@@ -1413,7 +1478,7 @@ export default function B2CElderPage() {
         )}
 
         {elderId && (
-          <>
+          <div className="space-y-4">
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-slate-700">Emergency Contacts</h3>
               {emergencyContacts.length === 0 ? (
@@ -1441,41 +1506,46 @@ export default function B2CElderPage() {
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={() => setShowAddEmergencyContact(true)}
-              className="w-full rounded-xl border-2 border-dashed border-slate-300 bg-white px-6 py-4 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition"
-            >
-              + Add Emergency Contact
-            </button>
-          </>
+            {!showAddEmergencyContact && !editingEmergencyContact && (
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingEmergencyContact(null)
+                  setShowAddEmergencyContact(true)
+                }}
+                className="w-full rounded-xl border-2 border-dashed border-slate-300 bg-white px-6 py-4 text-sm font-medium text-slate-700 hover:border-slate-400 hover:bg-slate-50 transition"
+              >
+                + Add Emergency Contact
+              </button>
+            )}
+
+            {showAddEmergencyContact && (
+              <EmergencyContactForm
+                onSave={handleEmergencyContactAdded}
+                onCancel={() => setShowAddEmergencyContact(false)}
+                isB2C={true}
+                elderId={elderId}
+                variant="inline"
+              />
+            )}
+
+            {editingEmergencyContact && (
+              <EmergencyContactForm
+                contact={{
+                  ...editingEmergencyContact,
+                  relation: editingEmergencyContact.elder_assignments?.[0]?.relation || ''
+                }}
+                onSave={handleEmergencyContactEdited}
+                onCancel={() => setEditingEmergencyContact(null)}
+                isB2C={true}
+                elderId={elderId}
+                variant="inline"
+              />
+            )}
+          </div>
         )}
       </section>
       </div>
-
-      {/* Emergency Contact Modals */}
-      {showAddEmergencyContact && (
-        <EmergencyContactForm
-          onSave={handleEmergencyContactAdded}
-          onCancel={() => setShowAddEmergencyContact(false)}
-          isB2C={true}
-          elderId={elderId}
-        />
-      )}
-
-      {editingEmergencyContact && (
-        <EmergencyContactForm
-          contact={{
-            ...editingEmergencyContact,
-            relation: editingEmergencyContact.elder_assignments?.[0]?.relation || ''
-          }}
-          onSave={handleEmergencyContactEdited}
-          onCancel={() => setEditingEmergencyContact(null)}
-          isB2C={true}
-          elderId={elderId}
-        />
-      )}
-
     </div>
   )
 }
