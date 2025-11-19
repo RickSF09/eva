@@ -87,42 +87,25 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
       }
 
       if (data.user) {
-        // Create user record in our users table
+        // Ensure user record exists/updates in our users table
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .insert({
-            auth_user_id: data.user.id,
-            email: formData.email,
-            first_name: formData.firstName,
-            last_name: formData.lastName,
-            phone: formData.phone,
-            account_type: formData.accountType,
-          })
+          .upsert(
+            {
+              auth_user_id: data.user.id,
+              email: formData.email,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              phone: formData.phone,
+              account_type: formData.accountType,
+            },
+            { onConflict: 'auth_user_id' }
+          )
           .select()
           .single()
 
         if (userError) {
-          console.error('Error creating user record:', userError)
-        } else if (userData && formData.accountType === 'b2c') {
-          // Create default notification preferences for B2C users with their email
-          const defaultTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
-          const { error: prefsError } = await supabase
-            .from('user_notification_prefs')
-            .insert({
-              user_id: userData.id,
-              email_cadence: 'per_call',
-              only_if_call: true,
-              send_time_local: '18:00:00',
-              timezone: defaultTimezone,
-              weekly_day_of_week: null,
-              include_transcript: false,
-              include_recording: false,
-              to_emails: [formData.email],
-            })
-
-          if (prefsError) {
-            console.error('Error creating notification preferences:', prefsError)
-          }
+          console.error('Error creating or updating user record:', userError)
         }
 
         setSuccess(true)
