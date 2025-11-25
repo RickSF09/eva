@@ -27,6 +27,10 @@ interface CallReportModalProps {
     execution_id?: string
     health_indicators?: any
     elder_id?: string
+    call_executions?: {
+      call_type?: string | null
+      onboarding_call?: boolean | null
+    } | null
   }
   onClose: () => void
   onOpenReport?: (report: any) => void
@@ -82,6 +86,35 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
     if (v < 0.66) return { bar: 'bg-yellow-500', chip: 'bg-yellow-100 text-yellow-700' }
     return { bar: 'bg-green-500', chip: 'bg-green-100 text-green-700' }
   })()
+
+  const getCallTypeInfo = (callType?: string | null) => {
+    switch (callType) {
+      case 'scheduled':
+        return { label: 'Scheduled', badge: 'bg-indigo-50 text-indigo-700 border border-indigo-200', dot: 'bg-indigo-500' }
+      case 'retry':
+        return { label: 'Retry', badge: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500' }
+      case 'emergency_contact':
+        return { label: 'Emergency contact', badge: 'bg-rose-50 text-rose-700 border border-rose-200', dot: 'bg-rose-500' }
+      case 'escalation_followup':
+        return { label: 'Escalation follow-up', badge: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500' }
+      case 'check_in':
+        return { label: 'Check-in', badge: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-500' }
+      case 'emergency':
+        return { label: 'Emergency', badge: 'bg-red-50 text-red-700 border border-red-200', dot: 'bg-red-500' }
+      case 'wellness':
+        return { label: 'Wellness', badge: 'bg-green-50 text-green-700 border border-green-200', dot: 'bg-green-500' }
+      case 'medication_reminder':
+        return { label: 'Medication', badge: 'bg-purple-50 text-purple-700 border border-purple-200', dot: 'bg-purple-500' }
+      case 'social':
+        return { label: 'Social', badge: 'bg-pink-50 text-pink-700 border border-pink-200', dot: 'bg-pink-500' }
+      case 'regular':
+        return { label: 'Regular', badge: 'bg-slate-50 text-slate-700 border border-slate-200', dot: 'bg-slate-500' }
+      default:
+        return { label: callType || 'Unknown', badge: 'bg-slate-50 text-slate-700 border border-slate-200', dot: 'bg-slate-400' }
+    }
+  }
+
+  const callTypeInfo = report.call_executions?.call_type ? getCallTypeInfo(report.call_executions.call_type) : null
 
   useEffect(() => {
     if (report.escalation_triggered) {
@@ -251,8 +284,14 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-xl font-semibold text-gray-900">Call Report</h2>
+              {callTypeInfo && (
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${callTypeInfo.badge}`}>
+                  <span className={`w-2 h-2 rounded-full mr-1.5 ${callTypeInfo.dot}`} />
+                  {callTypeInfo.label}
+                </span>
+              )}
               {report.escalation_triggered && (
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border border-red-300 text-red-700 bg-red-50">
                   <AlertTriangle className="w-3.5 h-3.5 mr-1" /> ESCALATED

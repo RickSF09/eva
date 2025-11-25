@@ -55,8 +55,19 @@ interface CallReport {
   elder_id?: string
   call_executions?: {
     onboarding_call: boolean | null
+    call_type?: string | null
   } | null
 }
+
+type CallTypeFilter = 'all' | 'scheduled' | 'retry' | 'emergency_contact' | 'escalation_followup'
+
+const CALL_TYPE_FILTERS: { value: CallTypeFilter; label: string }[] = [
+  { value: 'all', label: 'All calls' },
+  { value: 'scheduled', label: 'Scheduled' },
+  { value: 'retry', label: 'Retry' },
+  { value: 'emergency_contact', label: 'Emergency contact' },
+  { value: 'escalation_followup', label: 'Escalation follow-up' },
+]
 
 export default function B2CHomePage() {
   const { user } = useAuth()
@@ -69,6 +80,7 @@ export default function B2CHomePage() {
   const [analysis, setAnalysis] = useState<any | null>(null)
   const [aggregation, setAggregation] = useState<'day' | 'week'>('day')
   const [currentPage, setCurrentPage] = useState(1)
+  const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>('all')
   const itemsPerPage = 5
 
   useEffect(() => {
@@ -115,7 +127,7 @@ export default function B2CHomePage() {
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
           const { data: reports } = await supabase
             .from('post_call_reports')
-            .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id, call_executions(onboarding_call)')
+            .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id, call_executions(onboarding_call, call_type)')
             .eq('elder_id', elderRecord.id)
             .gte('call_started_at', thirtyDaysAgo)
             .order('call_started_at', { ascending: false })
@@ -222,6 +234,33 @@ export default function B2CHomePage() {
     }
   }
 
+  const getCallTypeInfo = (callType?: string | null) => {
+    switch (callType) {
+      case 'scheduled':
+        return { label: 'Scheduled', badge: 'bg-indigo-50 text-indigo-700 border border-indigo-200', dot: 'bg-indigo-500' }
+      case 'retry':
+        return { label: 'Retry', badge: 'bg-orange-50 text-orange-700 border border-orange-200', dot: 'bg-orange-500' }
+      case 'emergency_contact':
+        return { label: 'Emergency contact', badge: 'bg-rose-50 text-rose-700 border border-rose-200', dot: 'bg-rose-500' }
+      case 'escalation_followup':
+        return { label: 'Escalation follow-up', badge: 'bg-amber-50 text-amber-700 border border-amber-200', dot: 'bg-amber-500' }
+      case 'check_in':
+        return { label: 'Check-in', badge: 'bg-blue-50 text-blue-700 border border-blue-200', dot: 'bg-blue-500' }
+      case 'emergency':
+        return { label: 'Emergency', badge: 'bg-red-50 text-red-700 border border-red-200', dot: 'bg-red-500' }
+      case 'wellness':
+        return { label: 'Wellness', badge: 'bg-green-50 text-green-700 border border-green-200', dot: 'bg-green-500' }
+      case 'medication_reminder':
+        return { label: 'Medication', badge: 'bg-purple-50 text-purple-700 border border-purple-200', dot: 'bg-purple-500' }
+      case 'social':
+        return { label: 'Social', badge: 'bg-pink-50 text-pink-700 border border-pink-200', dot: 'bg-pink-500' }
+      case 'regular':
+        return { label: 'Regular', badge: 'bg-slate-50 text-slate-700 border border-slate-200', dot: 'bg-slate-500' }
+      default:
+        return { label: callType || 'Unknown', badge: 'bg-slate-50 text-slate-700 border border-slate-200', dot: 'bg-slate-400' }
+    }
+  }
+
   // Build chart data for mood and tone
   const { moodSeries, toneSeries } = useMemo(() => {
     const moodPoints: { key: string; label: string; value: number; textLabel: string }[] = []
@@ -272,16 +311,26 @@ export default function B2CHomePage() {
     return { moodSeries: moodPoints, toneSeries: tonePoints }
   }, [callReports, aggregation])
 
-  // Pagination logic for call history
-  const totalPages = Math.ceil(callReports.length / itemsPerPage)
+  // Call type filtering and pagination logic for call history
+  const filteredReports = useMemo(() => {
+    if (callTypeFilter === 'all') {
+      return callReports
+    }
+    return callReports.filter(report => report.call_executions?.call_type === callTypeFilter)
+  }, [callReports, callTypeFilter])
+
+  const activeFilterLabel = CALL_TYPE_FILTERS.find(opt => opt.value === callTypeFilter)?.label ?? 'All calls'
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage)
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
-  const paginatedReports = callReports.slice(startIndex, endIndex)
+  const paginatedReports = filteredReports.slice(startIndex, endIndex)
+  const showingStart = filteredReports.length > 0 ? startIndex + 1 : 0
+  const showingEnd = filteredReports.length > 0 ? Math.min(endIndex, filteredReports.length) : 0
 
-  // Reset to page 1 when callReports changes
+  // Reset to page 1 when data set or filter changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [callReports.length])
+  }, [callReports.length, callTypeFilter])
 
   // Calculate quick stats
   const quickStats = useMemo(() => {
@@ -602,16 +651,37 @@ export default function B2CHomePage() {
       )}
 
       <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">Call History</h2>
-          {callReports.length > itemsPerPage && (
-            <span className="text-xs text-slate-500">
-              Showing {startIndex + 1}-{Math.min(endIndex, callReports.length)} of {callReports.length}
-            </span>
-          )}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Call History</h2>
+            {filteredReports.length > itemsPerPage && (
+              <span className="text-xs text-slate-500">
+                Showing {showingStart}-{showingEnd} of {filteredReports.length}
+                {callTypeFilter !== 'all' ? ` • ${activeFilterLabel}` : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <label htmlFor="call-type-filter" className="text-xs font-medium text-slate-500">
+              Call type
+            </label>
+            <select
+              id="call-type-filter"
+              value={callTypeFilter}
+              onChange={(event) => setCallTypeFilter(event.target.value as CallTypeFilter)}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            >
+              {CALL_TYPE_FILTERS.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
           {callReports.length > 0 ? (
-            <>
+            filteredReports.length > 0 ? (
+              <>
               <div className="mt-4 space-y-3">
                 {paginatedReports.map((report) => {
                 const moodValue = typeof report.sentiment_score === 'number' 
@@ -620,6 +690,7 @@ export default function B2CHomePage() {
                 const moodDisplay = Number.isFinite(moodValue) 
                   ? `${Math.round(moodValue * 100)}%`
                   : report.mood_assessment || 'N/A'
+                const callTypeInfo = report.call_executions?.call_type ? getCallTypeInfo(report.call_executions.call_type) : null
 
                 return (
                   <button
@@ -641,6 +712,12 @@ export default function B2CHomePage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          {callTypeInfo && (
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${callTypeInfo.badge}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full mr-1 ${callTypeInfo.dot}`} />
+                              {callTypeInfo.label}
+                            </span>
+                          )}
                           {report.call_executions?.onboarding_call && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
                               <UserPlus className="w-3 h-3 mr-1" />
@@ -669,7 +746,7 @@ export default function B2CHomePage() {
                 )
               })}
               </div>
-              
+
               {totalPages > 1 && (
                 <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
                   <button
@@ -698,6 +775,12 @@ export default function B2CHomePage() {
                 </div>
               )}
             </>
+            ) : (
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500">
+                <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
+                <p>No calls match the selected filter.</p>
+              </div>
+            )
           ) : (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500">
               <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
