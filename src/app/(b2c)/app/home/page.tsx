@@ -7,7 +7,7 @@ import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { CallReportModal } from '@/components/calls/CallReportModal'
 import { formatDateTime, formatDuration } from '@/lib/utils'
-import { Clock, ChevronRight, ChevronLeft, AlertTriangle, Sparkles, ShieldAlert, Activity, ArrowUpRight, ArrowDownRight, Minus, Phone, Mail, TrendingUp } from 'lucide-react'
+import { Clock, ChevronRight, ChevronLeft, AlertTriangle, Sparkles, ShieldAlert, Activity, ArrowUpRight, ArrowDownRight, Minus, Phone, Mail, TrendingUp, UserPlus } from 'lucide-react'
 import { format, parseISO, startOfWeek } from 'date-fns'
 import {
   ResponsiveContainer,
@@ -53,6 +53,9 @@ interface CallReport {
   health_indicators?: any
   agenda_completion?: any
   elder_id?: string
+  call_executions?: {
+    onboarding_call: boolean | null
+  } | null
 }
 
 export default function B2CHomePage() {
@@ -112,7 +115,7 @@ export default function B2CHomePage() {
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
           const { data: reports } = await supabase
             .from('post_call_reports')
-            .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id')
+            .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id, call_executions(onboarding_call)')
             .eq('elder_id', elderRecord.id)
             .gte('call_started_at', thirtyDaysAgo)
             .order('call_started_at', { ascending: false })
@@ -631,6 +634,12 @@ export default function B2CHomePage() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          {report.call_executions?.onboarding_call && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                              <UserPlus className="w-3 h-3 mr-1" />
+                              Onboarding
+                            </span>
+                          )}
                           {report.escalation_triggered && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                               <AlertTriangle className="w-3 h-3 mr-1" />

@@ -107,6 +107,7 @@ export type Database = {
           id: string
           instructions: string | null
           meta_data: Json | null
+          onboarding_call: boolean | null
           open_ai_call_id: string | null
           open_ai_session_id: string | null
           retry_count: number | null
@@ -130,6 +131,7 @@ export type Database = {
           id?: string
           instructions?: string | null
           meta_data?: Json | null
+          onboarding_call?: boolean | null
           open_ai_call_id?: string | null
           open_ai_session_id?: string | null
           retry_count?: number | null
@@ -153,6 +155,7 @@ export type Database = {
           id?: string
           instructions?: string | null
           meta_data?: Json | null
+          onboarding_call?: boolean | null
           open_ai_call_id?: string | null
           open_ai_session_id?: string | null
           retry_count?: number | null
@@ -626,6 +629,7 @@ export type Database = {
           org_id: string | null
           personal_info: string | null
           phone: string
+          preferences: Json | null
           updated_at: string
           user_id: string | null
         }
@@ -644,6 +648,7 @@ export type Database = {
           org_id?: string | null
           personal_info?: string | null
           phone: string
+          preferences?: Json | null
           updated_at?: string
           user_id?: string | null
         }
@@ -662,6 +667,7 @@ export type Database = {
           org_id?: string | null
           personal_info?: string | null
           phone?: string
+          preferences?: Json | null
           updated_at?: string
           user_id?: string | null
         }

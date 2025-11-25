@@ -6,7 +6,8 @@ import { CheckCircle2, AlertCircle, Clock, Calendar, Edit2, X, Trash2, Plus, Pho
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { EmergencyContactForm } from '@/components/emergency/EmergencyContactForm'
-import type { TablesInsert } from '@/types/database'
+import { ElderPreferencesForm } from '@/components/elders/ElderPreferencesForm'
+import type { TablesInsert, Json } from '@/types/database'
 import {
   composeE164,
   detectCountryCodeFromE164,
@@ -148,6 +149,7 @@ export default function B2CElderPage() {
   const [feedback, setFeedback] = useState<Feedback>(null)
   const [phoneError, setPhoneError] = useState<string | null>(null)
   const [countryCode, setCountryCode] = useState<SupportedCountryCode>('+44')
+  const [initialPreferences, setInitialPreferences] = useState<Json | null>(null)
 
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(DEFAULT_SCHEDULE)
   const [scheduleSaving, setScheduleSaving] = useState(false)
@@ -192,7 +194,7 @@ export default function B2CElderPage() {
 
         const { data: elder } = await supabase
           .from('elders')
-          .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info')
+          .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info, preferences')
           .eq('user_id', profile.id)
           .single()
 
@@ -209,6 +211,7 @@ export default function B2CElderPage() {
             medications: elder.medications ?? '',
             personal_info: elder.personal_info ?? '',
           })
+          setInitialPreferences(elder.preferences)
           setCountryCode(detectCountryCodeFromE164(elder.phone))
           setPhoneError(null)
           fetchSchedules(elder.id)
@@ -216,6 +219,7 @@ export default function B2CElderPage() {
         } else {
           setElderId(null)
           setForm(DEFAULT_ELDER)
+          setInitialPreferences(null)
           setCountryCode('+44')
           setPhoneError(null)
           setSchedules([])
@@ -1550,6 +1554,12 @@ export default function B2CElderPage() {
         )}
       </section>
       </div>
+
+      {elderId && (
+        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+          <ElderPreferencesForm elderId={elderId} initialPreferences={initialPreferences} />
+        </section>
+      )}
     </div>
   )
 }
