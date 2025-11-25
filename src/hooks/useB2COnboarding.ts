@@ -205,8 +205,8 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
           throw contactError
         }
 
-        contacts =
-          contactRows?.map((row: any) => {
+        const mappedContacts = (contactRows ?? [])
+          .map((row: any) => {
             const contact = Array.isArray(row.emergency_contacts) ? row.emergency_contacts[0] : row.emergency_contacts
             if (!contact?.id) return null
             return {
@@ -217,7 +217,10 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
               relation: (row.relation as string) ?? null,
               priority: typeof row['priority order'] === 'number' ? row['priority order'] : null,
             } satisfies EmergencyContactSummary
-          })?.filter((item): item is EmergencyContactSummary => Boolean(item)) ?? []
+          })
+          .filter((item): item is EmergencyContactSummary => Boolean(item))
+
+        contacts = mappedContacts
       }
 
       setSnapshot({
