@@ -121,7 +121,14 @@ export default function B2CHomePage() {
             .order('call_started_at', { ascending: false })
             .limit(20)
 
-          setCallReports(reports || [])
+          const formattedReports = (reports || []).map(r => ({
+            ...r,
+            call_executions: Array.isArray(r.call_executions) 
+              ? (r.call_executions[0] || null) 
+              : (r.call_executions || null)
+          })) as CallReport[]
+
+          setCallReports(formattedReports)
 
           // Fetch latest analysis
           const { data: analysisData } = await supabase
