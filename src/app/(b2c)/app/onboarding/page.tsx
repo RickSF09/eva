@@ -784,8 +784,8 @@ function ScheduleStep({
     if (!template) return
     setForm((prev) => ({
       ...prev,
-      days: template.days,
-      times: template.times,
+      days: [...template.days],
+      times: [...template.times],
       description: prev.description || template.helper,
     }))
     setMessage(null)
