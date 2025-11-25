@@ -106,7 +106,9 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
     }
   }
 
-  const updateField = (section: keyof ElderPreferences, field: string, value: any) => {
+  type PreferenceSection = Exclude<keyof ElderPreferences, 'summary'>
+
+  const updateField = (section: PreferenceSection, field: string, value: any) => {
     setPreferences(prev => ({
       ...prev,
       [section]: {
