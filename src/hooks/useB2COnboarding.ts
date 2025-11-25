@@ -129,7 +129,7 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
 
       const { data: elderData, error: elderError } = await supabase
         .from('elders')
-        .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info')
+        .select('id, first_name, last_name, phone, address, medical_conditions, medications, medications, personal_info')
         .eq('user_id', profile.id)
         .maybeSingle()
 
@@ -209,14 +209,16 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
           .map((row: any) => {
             const contact = Array.isArray(row.emergency_contacts) ? row.emergency_contacts[0] : row.emergency_contacts
             if (!contact?.id) return null
-            return {
+            
+            const summary: EmergencyContactSummary = {
               id: contact.id as string,
               name: contact.name as string,
               phone: contact.phone as string,
-              email: (contact.email as string) ?? null,
-              relation: (row.relation as string) ?? null,
+              email: (contact.email as string) || null,
+              relation: (row.relation as string) || null,
               priority: typeof row['priority order'] === 'number' ? row['priority order'] : null,
-            } satisfies EmergencyContactSummary
+            }
+            return summary
           })
           .filter((item): item is EmergencyContactSummary => Boolean(item))
 
@@ -292,5 +294,4 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
     refresh: fetchSnapshot,
   }
 }
-
 
