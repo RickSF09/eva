@@ -99,22 +99,27 @@ export type Database = {
       }
       call_executions: {
         Row: {
+          answered_by: string | null
           attempted_at: string | null
           call_type: string
           completed_at: string | null
           created_at: string
           elder_id: string
+          ended_by: string | null
           id: string
           instructions: string | null
           meta_data: Json | null
           onboarding_call: boolean | null
           open_ai_call_id: string | null
           open_ai_session_id: string | null
+          picked_up: boolean | null
+          retry_call: boolean | null
           retry_count: number | null
           schedule_id: string | null
-          scheduled_for: string
+          scheduled_for: string | null
           status: string
           to_number: string | null
+          tools: Json | null
           twilio_call_sid: string | null
           twilio_child_call_sid: string | null
           updated_at: string
@@ -123,22 +128,27 @@ export type Database = {
           webhook_url: string | null
         }
         Insert: {
+          answered_by?: string | null
           attempted_at?: string | null
           call_type: string
           completed_at?: string | null
           created_at?: string
           elder_id: string
+          ended_by?: string | null
           id?: string
           instructions?: string | null
           meta_data?: Json | null
           onboarding_call?: boolean | null
           open_ai_call_id?: string | null
           open_ai_session_id?: string | null
+          picked_up?: boolean | null
+          retry_call?: boolean | null
           retry_count?: number | null
           schedule_id?: string | null
-          scheduled_for: string
+          scheduled_for?: string | null
           status?: string
           to_number?: string | null
+          tools?: Json | null
           twilio_call_sid?: string | null
           twilio_child_call_sid?: string | null
           updated_at?: string
@@ -147,22 +157,27 @@ export type Database = {
           webhook_url?: string | null
         }
         Update: {
+          answered_by?: string | null
           attempted_at?: string | null
           call_type?: string
           completed_at?: string | null
           created_at?: string
           elder_id?: string
+          ended_by?: string | null
           id?: string
           instructions?: string | null
           meta_data?: Json | null
           onboarding_call?: boolean | null
           open_ai_call_id?: string | null
           open_ai_session_id?: string | null
+          picked_up?: boolean | null
+          retry_call?: boolean | null
           retry_count?: number | null
           schedule_id?: string | null
-          scheduled_for?: string
+          scheduled_for?: string | null
           status?: string
           to_number?: string | null
+          tools?: Json | null
           twilio_call_sid?: string | null
           twilio_child_call_sid?: string | null
           updated_at?: string
@@ -309,7 +324,7 @@ export type Database = {
           missed_calls?: number | null
           overall_mood?: string | null
           overall_tone?: string | null
-          report_date?: string
+          report_date: string
           successful_calls?: number | null
           summary?: string | null
           total_call_costs?: number | null
@@ -326,128 +341,88 @@ export type Database = {
           },
         ]
       }
-      device_events: {
+      demo_calls: {
         Row: {
-          created_at: string
-          device_id: string | null
-          elder_id: string
-          event_data: string | null
-          event_timestamp: string
-          event_type: string
+          analysis: Json | null
+          created_at: string | null
+          duration_seconds: number | null
+          email_sent: boolean | null
+          email_sent_at: string | null
+          ended_at: string | null
           id: string
-          location_data: Json | null
-          processed: boolean | null
-          triggered_execution_id: string | null
+          lead_id: string | null
+          session_id: string
+          started_at: string | null
+          total_cost_usd: number | null
+          total_tokens: number | null
+          transcript: Json | null
+          updated_at: string | null
         }
         Insert: {
-          created_at?: string
-          device_id?: string | null
-          elder_id: string
-          event_data?: string | null
-          event_timestamp: string
-          event_type: string
+          analysis?: Json | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
+          ended_at?: string | null
           id?: string
-          location_data?: Json | null
-          processed?: boolean | null
-          triggered_execution_id?: string | null
+          lead_id?: string | null
+          session_id: string
+          started_at?: string | null
+          total_cost_usd?: number | null
+          total_tokens?: number | null
+          transcript?: Json | null
+          updated_at?: string | null
         }
         Update: {
-          created_at?: string
-          device_id?: string | null
-          elder_id?: string
-          event_data?: string | null
-          event_timestamp?: string
-          event_type?: string
+          analysis?: Json | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
+          ended_at?: string | null
           id?: string
-          location_data?: Json | null
-          processed?: boolean | null
-          triggered_execution_id?: string | null
+          lead_id?: string | null
+          session_id?: string
+          started_at?: string | null
+          total_cost_usd?: number | null
+          total_tokens?: number | null
+          transcript?: Json | null
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "device_events_device_id_fkey"
-            columns: ["device_id"]
+            foreignKeyName: "demo_calls_lead_id_fkey"
+            columns: ["lead_id"]
             isOneToOne: false
-            referencedRelation: "device_settings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "device_events_elder_id_fkey"
-            columns: ["elder_id"]
-            isOneToOne: false
-            referencedRelation: "elders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "device_events_triggered_execution_id_fkey"
-            columns: ["triggered_execution_id"]
-            isOneToOne: false
-            referencedRelation: "call_executions"
+            referencedRelation: "demo_leads"
             referencedColumns: ["id"]
           },
         ]
       }
-      device_settings: {
+      demo_leads: {
         Row: {
-          battery_level: number | null
-          created_at: string
-          device_metadata: Json | null
-          device_serial: string | null
-          device_type: string | null
-          elder_id: string
-          fall_detection_enabled: boolean | null
-          firmware_version: string | null
-          geofence_radius_meters: number | null
-          geofencing_enabled: boolean | null
+          created_at: string | null
+          email: string | null
           id: string
-          last_heartbeat: string | null
-          last_sync: string | null
-          sos_button_enabled: boolean | null
-          updated_at: string
+          name: string | null
+          updated_at: string | null
         }
         Insert: {
-          battery_level?: number | null
-          created_at?: string
-          device_metadata?: Json | null
-          device_serial?: string | null
-          device_type?: string | null
-          elder_id: string
-          fall_detection_enabled?: boolean | null
-          firmware_version?: string | null
-          geofence_radius_meters?: number | null
-          geofencing_enabled?: boolean | null
+          created_at?: string | null
+          email?: string | null
           id?: string
-          last_heartbeat?: string | null
-          last_sync?: string | null
-          sos_button_enabled?: boolean | null
-          updated_at?: string
+          name?: string | null
+          updated_at?: string | null
         }
         Update: {
-          battery_level?: number | null
-          created_at?: string
-          device_metadata?: Json | null
-          device_serial?: string | null
-          device_type?: string | null
-          elder_id?: string
-          fall_detection_enabled?: boolean | null
-          firmware_version?: string | null
-          geofence_radius_meters?: number | null
-          geofencing_enabled?: boolean | null
+          created_at?: string | null
+          email?: string | null
           id?: string
-          last_heartbeat?: string | null
-          last_sync?: string | null
-          sos_button_enabled?: boolean | null
-          updated_at?: string
+          name?: string | null
+          updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "device_settings_elder_id_fkey"
-            columns: ["elder_id"]
-            isOneToOne: false
-            referencedRelation: "elders"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       elder_analysis_reports: {
         Row: {
@@ -618,14 +593,13 @@ export type Database = {
           active: boolean | null
           address: string | null
           created_at: string
-          emergency_instructions: string | null
           first_name: string
-          geofence_boundaries: Json | null
           id: string
           last_name: string
-          location_coordinates: Json | null
           medical_conditions: string | null
           medications: string | null
+          onboarding_completed: boolean | null
+          onboarding_completed_at: string | null
           org_id: string | null
           personal_info: string | null
           phone: string
@@ -637,14 +611,13 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           created_at?: string
-          emergency_instructions?: string | null
           first_name: string
-          geofence_boundaries?: Json | null
           id?: string
           last_name: string
-          location_coordinates?: Json | null
           medical_conditions?: string | null
           medications?: string | null
+          onboarding_completed?: boolean | null
+          onboarding_completed_at?: string | null
           org_id?: string | null
           personal_info?: string | null
           phone: string
@@ -656,14 +629,13 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           created_at?: string
-          emergency_instructions?: string | null
           first_name?: string
-          geofence_boundaries?: Json | null
           id?: string
           last_name?: string
-          location_coordinates?: Json | null
           medical_conditions?: string | null
           medications?: string | null
+          onboarding_completed?: boolean | null
+          onboarding_completed_at?: string | null
           org_id?: string | null
           personal_info?: string | null
           phone?: string
@@ -754,8 +726,8 @@ export type Database = {
           contact_method: string
           contact_response: string | null
           created_at: string
-          emergency_contact_id: string
-          escalation_incident_id: string
+          emergency_contact_id: string | null
+          escalation_incident_id: string | null
           id: string
           status: string
         }
@@ -767,8 +739,8 @@ export type Database = {
           contact_method: string
           contact_response?: string | null
           created_at?: string
-          emergency_contact_id: string
-          escalation_incident_id: string
+          emergency_contact_id?: string | null
+          escalation_incident_id?: string | null
           id?: string
           status: string
         }
@@ -780,8 +752,8 @@ export type Database = {
           contact_method?: string
           contact_response?: string | null
           created_at?: string
-          emergency_contact_id?: string
-          escalation_incident_id?: string
+          emergency_contact_id?: string | null
+          escalation_incident_id?: string | null
           id?: string
           status?: string
         }
@@ -943,6 +915,63 @@ export type Database = {
           },
         ]
       }
+      notification_sends: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          period_end: string | null
+          period_start: string | null
+          provider_message_id: string | null
+          resource_id: string | null
+          resource_type: string
+          sent_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          provider_message_id?: string | null
+          resource_id?: string | null
+          resource_type: string
+          sent_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          period_end?: string | null
+          period_start?: string | null
+          provider_message_id?: string | null
+          resource_id?: string | null
+          resource_type?: string
+          sent_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_sends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_current_context"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "notification_sends_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_invitations: {
         Row: {
           created_at: string | null
@@ -977,7 +1006,7 @@ export type Database = {
           email_normalized?: string | null
           expires_at?: string | null
           id?: string
-          org_id?: string
+          org_id: string
           role?: string
           status?: string
           token?: string
@@ -1053,6 +1082,7 @@ export type Database = {
           health_indicators: Json | null
           id: string
           mood_assessment: string | null
+          recording_storage_path: string | null
           recording_url: string | null
           sentiment_score: number | null
           summary: string | null
@@ -1061,7 +1091,6 @@ export type Database = {
           twilio_cost_usd: number | null
           vapi_call_id: string | null
           vapi_cost_pence: number | null
-          recording_storage_path: string | null
         }
         Insert: {
           agenda_completion?: Json | null
@@ -1078,8 +1107,8 @@ export type Database = {
           health_indicators?: Json | null
           id?: string
           mood_assessment?: string | null
-          recording_url?: string | null
           recording_storage_path?: string | null
+          recording_url?: string | null
           sentiment_score?: number | null
           summary?: string | null
           tone_analysis?: string | null
@@ -1103,8 +1132,8 @@ export type Database = {
           health_indicators?: Json | null
           id?: string
           mood_assessment?: string | null
-          recording_url?: string | null
           recording_storage_path?: string | null
+          recording_url?: string | null
           sentiment_score?: number | null
           summary?: string | null
           tone_analysis?: string | null
@@ -1126,6 +1155,101 @@ export type Database = {
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "call_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tool_call_usage: {
+        Row: {
+          created_at: string
+          execution_id: string | null
+          id: string
+          input: Json | null
+          output: Json | null
+          type: string | null
+        }
+        Insert: {
+          created_at?: string
+          execution_id?: string | null
+          id?: string
+          input?: Json | null
+          output?: Json | null
+          type?: string | null
+        }
+        Update: {
+          created_at?: string
+          execution_id?: string | null
+          id?: string
+          input?: Json | null
+          output?: Json | null
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tool_call_usage_execution_id_fkey"
+            columns: ["execution_id"]
+            isOneToOne: false
+            referencedRelation: "call_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_notification_prefs: {
+        Row: {
+          created_at: string
+          email_cadence: string
+          id: string
+          include_recording: boolean
+          include_transcript: boolean
+          only_if_call: boolean
+          send_time_local: string
+          timezone: string
+          to_emails: Json | null
+          updated_at: string
+          user_id: string
+          weekly_day_of_week: number | null
+        }
+        Insert: {
+          created_at?: string
+          email_cadence?: string
+          id?: string
+          include_recording?: boolean
+          include_transcript?: boolean
+          only_if_call?: boolean
+          send_time_local?: string
+          timezone?: string
+          to_emails?: Json | null
+          updated_at?: string
+          user_id: string
+          weekly_day_of_week?: number | null
+        }
+        Update: {
+          created_at?: string
+          email_cadence?: string
+          id?: string
+          include_recording?: boolean
+          include_transcript?: boolean
+          only_if_call?: boolean
+          send_time_local?: string
+          timezone?: string
+          to_emails?: Json | null
+          updated_at?: string
+          user_id?: string
+          weekly_day_of_week?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_current_context"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_notification_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1184,54 +1308,66 @@ export type Database = {
       }
       users: {
         Row: {
-          account_type: "b2b" | "b2c" | null
+          account_type: string
           auth_user_id: string | null
           created_at: string
           email: string
           first_name: string
+          health_data_processing_consent: boolean | null
+          health_data_processing_consent_timestamp: string | null
           id: string
           last_name: string
+          phone: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_cancel_at_period_end: boolean | null
           subscription_current_period_end: string | null
           subscription_plan: string | null
           subscription_status: string | null
-          phone: string | null
+          terms_privacy_consent: boolean | null
+          terms_privacy_consent_timestamp: string | null
           updated_at: string
         }
         Insert: {
-          account_type?: "b2b" | "b2c" | null
+          account_type?: string
           auth_user_id?: string | null
           created_at?: string
           email: string
           first_name: string
+          health_data_processing_consent?: boolean | null
+          health_data_processing_consent_timestamp?: string | null
           id?: string
           last_name: string
+          phone?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_cancel_at_period_end?: boolean | null
           subscription_current_period_end?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
-          phone?: string | null
+          terms_privacy_consent?: boolean | null
+          terms_privacy_consent_timestamp?: string | null
           updated_at?: string
         }
         Update: {
-          account_type?: "b2b" | "b2c" | null
+          account_type?: string
           auth_user_id?: string | null
           created_at?: string
           email?: string
           first_name?: string
+          health_data_processing_consent?: boolean | null
+          health_data_processing_consent_timestamp?: string | null
           id?: string
           last_name?: string
+          phone?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_cancel_at_period_end?: boolean | null
           subscription_current_period_end?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
-          phone?: string | null
+          terms_privacy_consent?: boolean | null
+          terms_privacy_consent_timestamp?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1295,6 +1431,7 @@ export type Database = {
         }
         Returns: string
       }
+      dispatch_scheduled_calls: { Args: never; Returns: number }
       get_user_organizations: {
         Args: { p_auth_user_id?: string }
         Returns: {
@@ -1442,5 +1579,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-
-

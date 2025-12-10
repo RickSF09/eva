@@ -96,9 +96,30 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ sessionId: session.id, url: session.url })
   } catch (error) {
-    console.error('Error creating checkout session', error)
+    console.error('Error creating checkout session:', error)
+    
+    // Provide more specific error messages for debugging
+    let message = 'Unable to create checkout session'
+    if (error instanceof Error) {
+      // Log the full error server-side
+      console.error('Full error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      })
+      
+      // Check for common configuration issues
+      if (error.message.includes('NEXT_PUBLIC_APP_URL')) {
+        message = 'Server misconfiguration: NEXT_PUBLIC_APP_URL is not set'
+      } else if (error.message.includes('STRIPE_SECRET_KEY')) {
+        message = 'Server misconfiguration: Stripe is not configured'
+      } else if (error.message.includes('No such price')) {
+        message = 'Invalid price ID. Please contact support.'
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Unable to create checkout session' },
+      { error: message },
       { status: 500 }
     )
   }

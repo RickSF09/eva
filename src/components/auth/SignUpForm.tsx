@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react'
+import Link from 'next/link'
 import {
   composeE164,
   detectCountryCodeFromE164,
@@ -31,6 +32,10 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   const [success, setSuccess] = useState(false)
   const [countryCode, setCountryCode] = useState<SupportedCountryCode>('+44')
   const [phoneError, setPhoneError] = useState<string | null>(null)
+  
+  // Consent checkboxes
+  const [familyConsent, setFamilyConsent] = useState(false)
+  const [healthDataConsent, setHealthDataConsent] = useState(false)
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const digits = sanitizeDigits(e.target.value)
@@ -62,6 +67,19 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
         setLoading(false)
         return
       }
+    }
+    
+    // Validate consents
+    if (!healthDataConsent) {
+      setError('You must consent to health data processing to continue.')
+      setLoading(false)
+      return
+    }
+
+    if (formData.accountType === 'b2c' && !familyConsent) {
+      setError('You must confirm family member consent to continue.')
+      setLoading(false)
+      return
     }
 
     try {
@@ -98,6 +116,10 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               last_name: formData.lastName,
               phone: formData.phone,
               account_type: formData.accountType,
+              terms_privacy_consent: true,
+              terms_privacy_consent_timestamp: new Date().toISOString(),
+              health_data_processing_consent: true,
+              health_data_processing_consent_timestamp: new Date().toISOString(),
             },
             { onConflict: 'auth_user_id' }
           )
@@ -306,19 +328,62 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             </div>
           </div>
 
+          <div className="space-y-4 pt-2">
+            {formData.accountType === 'b2c' && (
+              <div className="flex items-start gap-3">
+                <input
+                  id="familyConsent"
+                  type="checkbox"
+                  checked={familyConsent}
+                  onChange={(e) => setFamilyConsent(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                />
+                <label htmlFor="familyConsent" className="text-sm text-gray-600 cursor-pointer select-none">
+                  I confirm that my family member is aware of EvaCares and has agreed to receive regular check-in calls from Eva.
+                </label>
+              </div>
+            )}
+
+            <div className="flex items-start gap-3">
+              <input
+                id="healthDataConsent"
+                type="checkbox"
+                checked={healthDataConsent}
+                onChange={(e) => setHealthDataConsent(e.target.checked)}
+                className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+              />
+              <label htmlFor="healthDataConsent" className="text-sm text-gray-600 cursor-pointer select-none">
+                I explicitly consent to EvaCares processing health information (such as mood, pain levels, and medication adherence) to provide wellness monitoring and family reports. This is required under UK GDPR for special category data.
+              </label>
+            </div>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3">
               <p className="text-red-600 text-sm">{error}</p>
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Creating account...' : 'Create account'}
-          </button>
+          <div className="space-y-4">
+             <p className="text-xs text-gray-500 text-center">
+              By clicking "Create account", you agree to our{' '}
+              <Link href="/terms" target="_blank" className="text-blue-600 hover:underline">
+                Terms and Conditions
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" target="_blank" className="text-blue-600 hover:underline">
+                Privacy Policy
+              </Link>.
+            </p>
+            
+            <button
+              type="submit"
+              disabled={loading || !healthDataConsent || (formData.accountType === 'b2c' && !familyConsent)}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Creating account...' : 'Create account'}
+            </button>
+          </div>
         </form>
 
         <div className="mt-6 text-center">
@@ -336,4 +401,3 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     </div>
   )
 }
-
