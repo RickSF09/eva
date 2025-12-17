@@ -151,6 +151,16 @@ export default function B2COnboardingPage() {
   const [activeStep, setActiveStep] = useState<OnboardingStepId>('elder')
   const [initialized, setInitialized] = useState(false)
 
+  console.log('B2COnboardingPage Render:', { 
+    loading, 
+    activeStep, 
+    nextStepId, 
+    isComplete, 
+    completedCount: steps.filter(s => s.completed).length,
+    billingParam,
+    hasSubscription: snapshot.hasSubscription
+  })
+
   useEffect(() => {
     if (!loading && !initialized) {
       setActiveStep(nextStepId)

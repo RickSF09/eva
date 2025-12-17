@@ -35,6 +35,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   
   // Consent checkboxes
   const [familyConsent, setFamilyConsent] = useState(false)
+  const [callRecordingNotified, setCallRecordingNotified] = useState(false)
   const [healthDataConsent, setHealthDataConsent] = useState(false)
 
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,10 +77,17 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
       return
     }
 
-    if (formData.accountType === 'b2c' && !familyConsent) {
-      setError('You must confirm family member consent to continue.')
-      setLoading(false)
-      return
+    if (formData.accountType === 'b2c') {
+      if (!familyConsent) {
+        setError('You must confirm family member consent to continue.')
+        setLoading(false)
+        return
+      }
+      if (!callRecordingNotified) {
+        setError('You must confirm the family member has been notified about call recording.')
+        setLoading(false)
+        return
+      }
     }
 
     try {
@@ -118,8 +126,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               account_type: formData.accountType,
               terms_privacy_consent: true,
               terms_privacy_consent_timestamp: new Date().toISOString(),
-              health_data_processing_consent: true,
-              health_data_processing_consent_timestamp: new Date().toISOString(),
+              family_consent_given: familyConsent,
+              family_consent_given_timestamp: familyConsent ? new Date().toISOString() : null,
+              call_recording_notified: callRecordingNotified,
+              call_recording_notified_timestamp: callRecordingNotified ? new Date().toISOString() : null,
+              health_data_processing_consent: healthDataConsent,
+              health_data_processing_consent_timestamp: healthDataConsent ? new Date().toISOString() : null,
             },
             { onConflict: 'auth_user_id' }
           )
@@ -330,18 +342,33 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
           <div className="space-y-4 pt-2">
             {formData.accountType === 'b2c' && (
-              <div className="flex items-start gap-3">
-                <input
-                  id="familyConsent"
-                  type="checkbox"
-                  checked={familyConsent}
-                  onChange={(e) => setFamilyConsent(e.target.checked)}
-                  className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                />
-                <label htmlFor="familyConsent" className="text-sm text-gray-600 cursor-pointer select-none">
-                  I confirm that my family member is aware of EvaCares and has agreed to receive regular check-in calls from Eva.
-                </label>
-              </div>
+              <>
+                <div className="flex items-start gap-3">
+                  <input
+                    id="familyConsent"
+                    type="checkbox"
+                    checked={familyConsent}
+                    onChange={(e) => setFamilyConsent(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor="familyConsent" className="text-sm text-gray-600 cursor-pointer select-none">
+                    I confirm my family member is aware of EvaCares and has agreed to receive calls from Eva
+                  </label>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <input
+                    id="callRecordingNotified"
+                    type="checkbox"
+                    checked={callRecordingNotified}
+                    onChange={(e) => setCallRecordingNotified(e.target.checked)}
+                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label htmlFor="callRecordingNotified" className="text-sm text-gray-600 cursor-pointer select-none">
+                    I have informed them that calls will be recorded for safety and family updates
+                  </label>
+                </div>
+              </>
             )}
 
             <div className="flex items-start gap-3">
@@ -353,7 +380,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                 className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
               />
               <label htmlFor="healthDataConsent" className="text-sm text-gray-600 cursor-pointer select-none">
-                I explicitly consent to EvaCares processing health information (such as mood, pain levels, and medication adherence) to provide wellness monitoring and family reports. This is required under UK GDPR for special category data.
+                I consent to processing health information (mood, pain, medication) for wellness monitoring
               </label>
             </div>
           </div>
@@ -378,7 +405,11 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             
             <button
               type="submit"
-              disabled={loading || !healthDataConsent || (formData.accountType === 'b2c' && !familyConsent)}
+              disabled={
+                loading ||
+                !healthDataConsent ||
+                (formData.accountType === 'b2c' && (!familyConsent || !callRecordingNotified))
+              }
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {loading ? 'Creating account...' : 'Create account'}

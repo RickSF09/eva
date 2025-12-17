@@ -98,7 +98,7 @@ export default function B2CSettingsPage() {
                   .from('user_notification_prefs')
                   .select('*')
                   .eq('user_id', result.data.id)
-                  .single()
+                  .maybeSingle()
                 return { data: prefs }
               }
               return { data: null }
