@@ -4,8 +4,11 @@ import { formatDateTime, formatDuration } from '@/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Phone, AlertTriangle, ArrowRight, CheckCircle, XCircle, User, ChevronDown, Play, Loader2 } from 'lucide-react'
+import { Tables } from '@/types/database'
 
 const RECORDING_URL_TTL_SECONDS = 60 * 60 * 2 // 2 hours
+
+type CallRequest = Tables<'call_requests'>
 
 interface CallReportModalProps {
   report: {
@@ -48,6 +51,10 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
   const [recordingLoading, setRecordingLoading] = useState(false)
   const [recordingError, setRecordingError] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  const [requests, setRequests] = useState<CallRequest[]>([])
+  const [requestsLoading, setRequestsLoading] = useState(false)
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
 
   const healthIndicators =
     report.health_indicators && typeof report.health_indicators === 'object'
@@ -143,6 +150,61 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
 
     play()
   }, [recordingUrl])
+
+  // Fetch Requests
+  useEffect(() => {
+    if (!report.id) {
+      setRequests([])
+      return
+    }
+
+    const fetchRequests = async () => {
+      setRequestsLoading(true)
+      try {
+        const { data, error } = await supabase
+          .from('call_requests')
+          .select('*')
+          .eq('call_id', report.id)
+          .order('created_at', { ascending: true })
+
+        if (error) throw error
+        setRequests(data || [])
+      } catch (err) {
+        console.error('Failed to fetch call requests', err)
+      } finally {
+        setRequestsLoading(false)
+      }
+    }
+
+    fetchRequests()
+  }, [report.id])
+
+  const handleResolveRequest = async (requestId: string) => {
+    try {
+      setResolvingId(requestId)
+      const { error } = await supabase
+        .from('call_requests')
+        .update({
+          resolved: true,
+          resolved_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+
+      if (error) throw error
+
+      // Update local state
+      setRequests(prev => prev.map(r =>
+        r.id === requestId
+          ? { ...r, resolved: true, resolved_at: new Date().toISOString() }
+          : r
+      ))
+    } catch (err) {
+      console.error('Failed to resolve request', err)
+      alert('Failed to update request status')
+    } finally {
+      setResolvingId(null)
+    }
+  }
 
   const handleLoadRecording = async () => {
     if (recordingLoading) return
@@ -307,6 +369,71 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
           <section>
             <h3 className="text-sm font-semibold text-gray-900 mb-2">AI Summary</h3>
             <p className="text-sm text-gray-800 whitespace-pre-wrap">{report.summary || 'No summary available'}</p>
+          </section>
+
+          {/* Requests & Needs Section */}
+          <section>
+             <h3 className="text-sm font-semibold text-gray-900 mb-2">Requests & Needs</h3>
+             {requestsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading requests...
+                </div>
+             ) : requests.length > 0 ? (
+                <div className="space-y-3">
+                  {requests.map((req) => (
+                    <div key={req.id} className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div className="flex justify-between items-start gap-3">
+                         <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                               {req.description.toLowerCase().includes('milk') || req.description.toLowerCase().includes('food') || req.description.toLowerCase().includes('grocer') ? (
+                                  <span className="text-xl">🏠</span>
+                               ) : req.description.toLowerCase().includes('grandkid') || req.description.toLowerCase().includes('family') || req.description.toLowerCase().includes('visit') ? (
+                                  <span className="text-xl">👨‍👩‍👧</span>
+                               ) : (
+                                  <span className="text-xl">📝</span>
+                               )}
+                               <span className="text-sm font-medium text-gray-900">{req.description}</span>
+                               {req.urgency && (
+                                 <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    req.urgency.toLowerCase().includes('high') ? 'bg-red-100 text-red-700' :
+                                    req.urgency.toLowerCase().includes('medium') ? 'bg-amber-100 text-amber-700' :
+                                    'bg-slate-100 text-slate-700'
+                                 }`}>
+                                    {req.urgency}
+                                 </span>
+                               )}
+                            </div>
+                            {req.quote && (
+                               <div className="text-sm text-gray-600 italic pl-7">"{req.quote}"</div>
+                            )}
+                         </div>
+                         {req.resolved ? (
+                            <span className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-full border border-green-200">
+                               <CheckCircle className="w-3 h-3" />
+                               Resolved
+                            </span>
+                         ) : (
+                            <button
+                               onClick={() => handleResolveRequest(req.id)}
+                               disabled={resolvingId === req.id}
+                               className="flex items-center gap-1 text-xs font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 transition-colors disabled:opacity-50"
+                            >
+                               {resolvingId === req.id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                               ) : (
+                                  <CheckCircle className="w-3 h-3" />
+                               )}
+                               Mark as Resolved
+                            </button>
+                         )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+             ) : (
+                <p className="text-sm text-gray-600">No requests mentioned during this call.</p>
+             )}
           </section>
 
           {(moodValue !== null || toneValue !== null) && (
@@ -627,5 +754,3 @@ export function CallReportModal({ report, onClose, onOpenReport }: CallReportMod
     </div>
   )
 }
-
-

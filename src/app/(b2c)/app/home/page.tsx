@@ -7,7 +7,7 @@ import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { CallReportModal } from '@/components/calls/CallReportModal'
 import { formatDateTime, formatDuration } from '@/lib/utils'
-import { Clock, ChevronRight, ChevronLeft, AlertTriangle, Sparkles, ShieldAlert, Activity, ArrowUpRight, ArrowDownRight, Minus, Phone, Mail, TrendingUp, UserPlus } from 'lucide-react'
+import { Clock, ChevronRight, ChevronLeft, AlertTriangle, Sparkles, ShieldAlert, Activity, ArrowUpRight, ArrowDownRight, Minus, Phone, Mail, TrendingUp, UserPlus, CheckCircle, Loader2 } from 'lucide-react'
 import { format, parseISO, startOfWeek } from 'date-fns'
 import {
   ResponsiveContainer,
@@ -78,6 +78,7 @@ export default function B2CHomePage() {
   const [callReports, setCallReports] = useState<CallReport[]>([])
   const [selectedReport, setSelectedReport] = useState<CallReport | null>(null)
   const [analysis, setAnalysis] = useState<any | null>(null)
+  const [activeRequests, setActiveRequests] = useState<any[]>([])
   const [aggregation, setAggregation] = useState<'day' | 'week'>('day')
   const [currentPage, setCurrentPage] = useState(1)
   const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>('all')
@@ -109,6 +110,7 @@ export default function B2CHomePage() {
           setProfile(null)
           setElder(null)
           setCallReports([])
+          setActiveRequests([])
           return
         }
 
@@ -142,6 +144,16 @@ export default function B2CHomePage() {
 
           setCallReports(formattedReports)
 
+          // Fetch active requests
+          const { data: requests } = await supabase
+            .from('call_requests')
+            .select('*')
+            .eq('elder_id', elderRecord.id)
+            .eq('resolved', false)
+            .order('created_at', { ascending: false })
+
+          setActiveRequests(requests || [])
+
           // Fetch latest analysis
           const { data: analysisData } = await supabase
             .from('elder_analysis_reports')
@@ -174,6 +186,7 @@ export default function B2CHomePage() {
           setElder(null)
           setCallReports([])
           setAnalysis(null)
+          setActiveRequests([])
         }
       } finally {
         if (active) {
@@ -188,6 +201,62 @@ export default function B2CHomePage() {
       active = false
     }
   }, [user])
+
+  const [resolvingId, setResolvingId] = useState<string | null>(null)
+
+  const handleResolveRequest = async (requestId: string, e: React.MouseEvent) => {
+    e.stopPropagation() // Prevent opening the report modal
+    try {
+      setResolvingId(requestId)
+      const { error } = await supabase
+        .from('call_requests')
+        .update({
+          resolved: true,
+          resolved_at: new Date().toISOString()
+        })
+        .eq('id', requestId)
+
+      if (error) throw error
+
+      // Update local state by removing the resolved request
+      setActiveRequests(prev => prev.filter(r => r.id !== requestId))
+    } catch (err) {
+      console.error('Failed to resolve request', err)
+      alert('Failed to update request status')
+    } finally {
+      setResolvingId(null)
+    }
+  }
+
+  const handleRequestClick = async (callId: string) => {
+    // If we have the report loaded in callReports, use that
+    const existingReport = callReports.find(r => r.id === callId)
+    if (existingReport) {
+      setSelectedReport(existingReport)
+      return
+    }
+
+    // Otherwise fetch the specific report
+    try {
+      const { data: report } = await supabase
+        .from('post_call_reports')
+        .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id, call_executions(onboarding_call, call_type)')
+        .eq('id', callId)
+        .single()
+
+      if (report) {
+         const formattedReport = {
+            ...report,
+            call_executions: Array.isArray(report.call_executions) 
+              ? (report.call_executions[0] || null) 
+              : (report.call_executions || null)
+          } as CallReport
+        setSelectedReport(formattedReport)
+      }
+    } catch (err) {
+      console.error('Failed to fetch linked report', err)
+    }
+  }
 
   // Helper function to convert numeric value to text label
   const getValueLabel = (value: number): string => {
@@ -469,6 +538,77 @@ export default function B2CHomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Active Requests Section */}
+      {activeRequests.length > 0 && (
+        <section className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-5 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+             <span className="text-xl">📝</span>
+             <h2 className="text-lg font-semibold text-blue-900">Active Requests & Needs</h2>
+          </div>
+          <div className="space-y-3">
+            {activeRequests.map((req) => (
+              <button
+                key={req.id}
+                onClick={() => handleRequestClick(req.call_id)}
+                className="w-full text-left bg-white border border-blue-100 rounded-xl p-4 hover:shadow-md transition-shadow group"
+              >
+                <div className="flex justify-between items-start gap-3">
+                   <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                         {req.description.toLowerCase().includes('milk') || req.description.toLowerCase().includes('food') || req.description.toLowerCase().includes('grocer') ? (
+                            <span className="text-xl">🏠</span>
+                         ) : req.description.toLowerCase().includes('grandkid') || req.description.toLowerCase().includes('family') || req.description.toLowerCase().includes('visit') ? (
+                            <span className="text-xl">👨‍👩‍👧</span>
+                         ) : (
+                            <span className="text-xl">📝</span>
+                         )}
+                         <span className="text-sm font-semibold text-slate-900">{req.description}</span>
+                         {req.urgency && (
+                           <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              req.urgency.toLowerCase().includes('high') ? 'bg-red-100 text-red-700' :
+                              req.urgency.toLowerCase().includes('medium') ? 'bg-amber-100 text-amber-700' :
+                              'bg-slate-100 text-slate-700'
+                           }`}>
+                              {req.urgency}
+                           </span>
+                         )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 pl-7">
+                        <Clock className="w-3 h-3" />
+                        <span>{format(parseISO(req.created_at), 'MMM d, h:mm a')}</span>
+                         {req.quote && (
+                           <span className="italic border-l border-slate-300 pl-2">"{req.quote}"</span>
+                        )}
+                      </div>
+                   </div>
+                   <div className="flex items-center gap-3">
+                      <button
+                         onClick={(e) => handleResolveRequest(req.id, e)}
+                         disabled={resolvingId === req.id}
+                         className="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-green-700 hover:bg-green-50 px-2 py-1 rounded-lg border border-transparent hover:border-green-200 transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                         title="Mark as resolved"
+                      >
+                         {resolvingId === req.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                         ) : (
+                            <>
+                               <CheckCircle className="w-4 h-4" />
+                               <span className="hidden sm:inline">Resolve</span>
+                            </>
+                         )}
+                      </button>
+                      <div className="flex items-center text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-xs font-medium mr-1 hidden sm:inline">View Report</span>
+                          <ChevronRight className="w-4 h-4" />
+                      </div>
+                   </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
       )}
 
       {analysis ? (

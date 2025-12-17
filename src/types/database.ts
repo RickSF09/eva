@@ -97,6 +97,60 @@ export type Database = {
           },
         ]
       }
+      call_requests: {
+        Row: {
+          id: string
+          call_id: string | null
+          elder_id: string | null
+          type: string | null
+          description: string
+          urgency: string | null
+          quote: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          call_id?: string | null
+          elder_id?: string | null
+          type?: string | null
+          description: string
+          urgency?: string | null
+          quote?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          call_id?: string | null
+          elder_id?: string | null
+          type?: string | null
+          description?: string
+          urgency?: string | null
+          quote?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_requests_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "call_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_requests_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       call_executions: {
         Row: {
           answered_by: string | null
