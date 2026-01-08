@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { X, User, Phone } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useOrganizations } from '@/hooks/useOrganizations'
+import { validateE164, type SupportedCountryCode } from '@/lib/phone'
 
 const RELATION_OPTIONS = [
   'Spouse',
@@ -71,7 +72,7 @@ export function EmergencyContactForm({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [phoneError, setPhoneError] = useState('')
-  const [countryCode, setCountryCode] = useState(() => {
+  const [countryCode, setCountryCode] = useState<SupportedCountryCode>(() => {
     // Detect country code from existing phone number
     if (contact?.phone) {
       if (contact.phone.startsWith('+1')) return '+1'
@@ -81,49 +82,6 @@ export function EmergencyContactForm({
     return '+44' // default
   })
 
-  const validatePhoneNumber = (phone: string) => {
-    // Remove any non-digit characters except +
-    const cleaned = phone.replace(/[^\d+]/g, '')
-    
-    // Check if it starts with the selected country code
-    if (!cleaned.startsWith(countryCode)) {
-      return `Phone number must start with ${countryCode}`
-    }
-    
-    // Validate length based on country code
-    let expectedLength: number
-    let expectedDigits: number
-    
-    switch (countryCode) {
-      case '+1':
-        expectedLength = 12 // +1 + 10 digits
-        expectedDigits = 10
-        break
-      case '+31':
-        expectedLength = 12 // +31 + 9 digits
-        expectedDigits = 9
-        break
-      case '+44':
-        expectedLength = 13 // +44 + 9 digits
-        expectedDigits = 9
-        break
-      default:
-        return 'Invalid country code'
-    }
-    
-    if (cleaned.length !== expectedLength) {
-      return `Phone number must be exactly ${expectedLength} characters (${countryCode} followed by ${expectedDigits} digits)`
-    }
-    
-    // Check if the part after country code has the correct number of digits
-    const afterCountryCode = cleaned.substring(countryCode.length)
-    if (!new RegExp(`^\\d{${expectedDigits}}$`).test(afterCountryCode)) {
-      return `Phone number must be in format ${countryCode} followed by ${expectedDigits} digits`
-    }
-    
-    return ''
-  }
-
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
     // Combine country code with phone number
@@ -131,15 +89,15 @@ export function EmergencyContactForm({
     setFormData({ ...formData, phone: fullPhone })
     
     if (value) {
-      const error = validatePhoneNumber(fullPhone)
-      setPhoneError(error)
+      const error = validateE164(fullPhone, countryCode)
+      setPhoneError(error || '')
     } else {
       setPhoneError('')
     }
   }
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCountryCode = e.target.value
+    const newCountryCode = e.target.value as SupportedCountryCode
     setCountryCode(newCountryCode)
     
     // Update phone number with new country code
@@ -149,8 +107,8 @@ export function EmergencyContactForm({
     
     // Re-validate
     if (currentDigits) {
-      const error = validatePhoneNumber(newPhone)
-      setPhoneError(error)
+      const error = validateE164(newPhone, newCountryCode)
+      setPhoneError(error || '')
     }
   }
 
@@ -175,7 +133,7 @@ export function EmergencyContactForm({
 
     // Validate phone number before submission
     if (formData.phone) {
-      const phoneValidationError = validatePhoneNumber(formData.phone)
+      const phoneValidationError = validateE164(formData.phone, countryCode)
       if (phoneValidationError) {
         setPhoneError(phoneValidationError)
         return
@@ -354,7 +312,7 @@ export function EmergencyContactForm({
                       value={formData.phone.startsWith(countryCode) ? formData.phone.slice(countryCode.length) : formData.phone}
                       onChange={handlePhoneChange}
                       className={`flex-1 rounded-r-lg border-0 px-3 py-2 ${textClass} focus:outline-none ${isB2C ? 'placeholder-slate-500' : 'placeholder-gray-500'}`}
-                      placeholder={countryCode === '+1' ? '5551234567' : countryCode === '+31' ? '612345678' : '729959925'}
+                      placeholder={countryCode === '+1' ? '5551234567' : countryCode === '+31' ? '612345678' : '7123456789'}
                       required
                     />
                   </div>
@@ -362,7 +320,7 @@ export function EmergencyContactForm({
                     <p className="mt-1 text-sm text-red-600">{phoneError}</p>
                   )}
                   <p className={`mt-1 text-xs ${isB2C ? 'text-slate-500' : 'text-gray-500'}`}>
-                    Format: {countryCode === '+1' ? '+15551234567' : countryCode === '+31' ? '+31612345678' : '+44729959925'} (no spaces or special characters)
+                    Format: {countryCode === '+1' ? '+15551234567' : countryCode === '+31' ? '+31612345678' : '+447123456789'} (no spaces or special characters)
                   </p>
                 </div>
               </div>

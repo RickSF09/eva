@@ -150,6 +150,7 @@ export default function B2COnboardingPage() {
   const { snapshot, steps, loading, error, isComplete, nextStepId, refresh } = useB2COnboardingSnapshot()
   const [activeStep, setActiveStep] = useState<OnboardingStepId>('elder')
   const [initialized, setInitialized] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   console.log('B2COnboardingPage Render:', { 
     loading, 
@@ -163,10 +164,16 @@ export default function B2COnboardingPage() {
 
   useEffect(() => {
     if (!loading && !initialized) {
+      if (isComplete && !billingParam) {
+        setIsRedirecting(true)
+        router.push('/app/home')
+        return
+      }
+
       setActiveStep(nextStepId)
       setInitialized(true)
     }
-  }, [loading, nextStepId, initialized])
+  }, [loading, nextStepId, initialized, isComplete, billingParam, router])
 
   useEffect(() => {
     if (billingParam) {
@@ -184,12 +191,14 @@ export default function B2COnboardingPage() {
     }
   }
 
-  if (loading) {
+  if (loading || isRedirecting) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-slate-600" />
-          <p className="mt-3 text-sm text-slate-500">Loading your onboarding flow…</p>
+          <p className="mt-3 text-sm text-slate-500">
+            {isRedirecting ? 'Redirecting to dashboard…' : 'Loading your onboarding flow…'}
+          </p>
         </div>
       </div>
     )
@@ -1441,7 +1450,10 @@ function ContactStep({
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">We only reach out if Eva can’t get hold of you.</p>
+          <div className="space-y-1">
+            <p className="text-xs text-slate-500">We only reach out if Eva can’t get hold of you.</p>
+            <p className="text-[11px] text-blue-600/70 font-medium">You can add more emergency contacts later from your dashboard.</p>
+          </div>
           <div className="flex gap-2">
             <button
               type="submit"

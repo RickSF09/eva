@@ -51,6 +51,166 @@ const DEFAULT_PREFERENCES: ElderPreferences = {
   summary: '',
 }
 
+const StringListInput = ({ 
+  items, 
+  onChange, 
+  label, 
+  placeholder = "Add item..." 
+}: { 
+  items: string[] | null, 
+  onChange: (items: string[]) => void,
+  label: string,
+  placeholder?: string
+}) => {
+  const list = items || []
+  const [newItem, setNewItem] = useState('')
+
+  const handleAdd = () => {
+    if (!newItem.trim()) return
+    onChange([...list, newItem.trim()])
+    setNewItem('')
+  }
+
+  const handleRemove = (index: number) => {
+    onChange(list.filter((_, i) => i !== index))
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAdd()
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-slate-700">{label}</label>
+      <div className="flex flex-wrap gap-2 mb-2">
+        {list.map((item, idx) => (
+          <div key={idx} className="flex items-center bg-slate-100 text-slate-800 text-sm px-2 py-1 rounded-md border border-slate-200">
+            <span>{item}</span>
+            <button 
+              onClick={() => handleRemove(idx)}
+              className="ml-1 text-slate-500 hover:text-red-600 focus:outline-none"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        />
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={!newItem.trim()}
+          className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const StringInput = ({
+  value,
+  onChange,
+  label,
+  placeholder
+}: {
+  value: string | null,
+  onChange: (val: string) => void,
+  label: string,
+  placeholder?: string
+}) => (
+  <div className="space-y-1">
+    <label className="block text-sm font-medium text-slate-700">{label}</label>
+    <textarea
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={2}
+      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+    />
+  </div>
+)
+
+const BooleanInput = ({
+  value,
+  onChange,
+  label
+}: {
+  value: boolean | null,
+  onChange: (val: boolean) => void,
+  label: string
+}) => (
+  <div className="flex items-center gap-3">
+    <label className="text-sm font-medium text-slate-700 min-w-[120px]">{label}</label>
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => onChange(true)}
+        className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
+          value === true 
+            ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
+            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        Yes
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange(false)}
+        className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
+          value === false
+            ? 'bg-rose-50 border-rose-200 text-rose-700' 
+            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+        }`}
+      >
+        No
+      </button>
+    </div>
+  </div>
+)
+
+const Section = ({ 
+  title, 
+  id, 
+  isExpanded,
+  onToggle,
+  children 
+}: { 
+  title: string, 
+  id: string, 
+  isExpanded: boolean,
+  onToggle: (id: string) => void,
+  children: React.ReactNode 
+}) => (
+  <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
+    <button
+      type="button"
+      onClick={() => onToggle(id)}
+      className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100 text-left"
+    >
+      <span className="font-semibold text-slate-800">{title}</span>
+      {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
+    </button>
+    {isExpanded && (
+      <div className="p-4 space-y-4">
+        {children}
+      </div>
+    )}
+  </div>
+)
+
 export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: ElderPreferencesFormProps) {
   const [preferences, setPreferences] = useState<ElderPreferences>(() => {
     if (!initialPreferences) return DEFAULT_PREFERENCES
@@ -68,17 +228,10 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
   })
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    favorites: false,
-    dislikes: false,
-    struggles: false,
-    helpful_things: false,
-    social: false,
-    background: false,
-  })
+  const [expandedSection, setExpandedSection] = useState<string | null>(null)
 
   const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
+    setExpandedSection(prev => prev === section ? null : section)
   }
 
   const handleSave = async () => {
@@ -120,162 +273,6 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
     if (feedback) setFeedback(null)
   }
 
-  const StringListInput = ({ 
-    items, 
-    onChange, 
-    label, 
-    placeholder = "Add item..." 
-  }: { 
-    items: string[] | null, 
-    onChange: (items: string[]) => void,
-    label: string,
-    placeholder?: string
-  }) => {
-    const list = items || []
-    const [newItem, setNewItem] = useState('')
-
-    const handleAdd = () => {
-      if (!newItem.trim()) return
-      onChange([...list, newItem.trim()])
-      setNewItem('')
-    }
-
-    const handleRemove = (index: number) => {
-      onChange(list.filter((_, i) => i !== index))
-    }
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        handleAdd()
-      }
-    }
-
-    return (
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-slate-700">{label}</label>
-        <div className="flex flex-wrap gap-2 mb-2">
-          {list.map((item, idx) => (
-            <div key={idx} className="flex items-center bg-slate-100 text-slate-800 text-sm px-2 py-1 rounded-md border border-slate-200">
-              <span>{item}</span>
-              <button 
-                onClick={() => handleRemove(idx)}
-                className="ml-1 text-slate-500 hover:text-red-600 focus:outline-none"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ))}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newItem}
-            onChange={(e) => setNewItem(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-          />
-          <button
-            type="button"
-            onClick={handleAdd}
-            disabled={!newItem.trim()}
-            className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  const StringInput = ({
-    value,
-    onChange,
-    label,
-    placeholder
-  }: {
-    value: string | null,
-    onChange: (val: string) => void,
-    label: string,
-    placeholder?: string
-  }) => (
-    <div className="space-y-1">
-      <label className="block text-sm font-medium text-slate-700">{label}</label>
-      <textarea
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={2}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-      />
-    </div>
-  )
-
-  const BooleanInput = ({
-    value,
-    onChange,
-    label
-  }: {
-    value: boolean | null,
-    onChange: (val: boolean) => void,
-    label: string
-  }) => (
-    <div className="flex items-center gap-3">
-      <label className="text-sm font-medium text-slate-700 min-w-[120px]">{label}</label>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => onChange(true)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
-            value === true 
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-700' 
-              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          Yes
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(false)}
-          className={`px-3 py-1.5 text-xs font-medium rounded-md border ${
-            value === false
-              ? 'bg-rose-50 border-rose-200 text-rose-700' 
-              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  )
-
-  const Section = ({ 
-    title, 
-    id, 
-    children 
-  }: { 
-    title: string, 
-    id: string, 
-    children: React.ReactNode 
-  }) => (
-    <div className="border rounded-xl overflow-hidden bg-white shadow-sm">
-      <button
-        type="button"
-        onClick={() => toggleSection(id)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100 text-left"
-      >
-        <span className="font-semibold text-slate-800">{title}</span>
-        {expandedSections[id] ? <ChevronDown className="h-4 w-4 text-slate-500" /> : <ChevronRight className="h-4 w-4 text-slate-500" />}
-      </button>
-      {expandedSections[id] && (
-        <div className="p-4 space-y-4">
-          {children}
-        </div>
-      )}
-    </div>
-  )
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -313,7 +310,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
       </div>
 
       <div className="space-y-4">
-        <Section title="Favorites" id="favorites">
+        <Section title="Favorites" id="favorites" isExpanded={expandedSection === 'favorites'} onToggle={toggleSection}>
           <div className="grid gap-4 md:grid-cols-2">
             <StringListInput 
               label="Topics" 
@@ -343,7 +340,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
           </div>
         </Section>
 
-        <Section title="Dislikes" id="dislikes">
+        <Section title="Dislikes" id="dislikes" isExpanded={expandedSection === 'dislikes'} onToggle={toggleSection}>
           <div className="grid gap-4 md:grid-cols-2">
             <StringListInput 
               label="Topics to Avoid" 
@@ -363,7 +360,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
           </div>
         </Section>
 
-        <Section title="Social & Well-being" id="social">
+        <Section title="Social & Well-being" id="social" isExpanded={expandedSection === 'social'} onToggle={toggleSection}>
           <div className="grid gap-4 md:grid-cols-2">
             <BooleanInput 
               label="Family Nearby" 
@@ -388,7 +385,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
           </div>
         </Section>
 
-        <Section title="Daily Life & Struggles" id="struggles">
+        <Section title="Daily Life & Struggles" id="struggles" isExpanded={expandedSection === 'struggles'} onToggle={toggleSection}>
           <div className="grid gap-4 md:grid-cols-2">
             <StringInput 
               label="Mobility Issues" 
@@ -418,7 +415,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
           </div>
         </Section>
 
-        <Section title="Helpful Things" id="helpful_things">
+        <Section title="Helpful Things" id="helpful_things" isExpanded={expandedSection === 'helpful_things'} onToggle={toggleSection}>
           <div className="grid gap-4 md:grid-cols-2">
             <StringInput 
               label="Communication Style" 
@@ -438,7 +435,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
           </div>
         </Section>
 
-        <Section title="Background" id="background">
+        <Section title="Background" id="background" isExpanded={expandedSection === 'background'} onToggle={toggleSection}>
           <div className="grid gap-4">
             <StringInput 
               label="Former Occupation" 

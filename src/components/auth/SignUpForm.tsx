@@ -178,16 +178,13 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   return (
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+        <div className="text-center mb-6">
+          <h1 className="text-xl font-semibold text-gray-900">
             Create your account
           </h1>
-          <p className="text-gray-600">
-            Get started with Eva Cares today
-          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               I am signing up as
@@ -202,7 +199,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
-                Business (teams)
+                Business
               </button>
               <button
                 type="button"
@@ -213,17 +210,26 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                     : 'border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
-                Family (caregiver)
+                Family
               </button>
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Choose “Business” if you manage care for multiple elders or teams. Choose “Family” for a single loved one.
+            <p className="mt-2 text-[11px] text-gray-500">
+              Business for teams. Family for individual care.
             </p>
           </div>
+
+          {formData.accountType === 'b2c' && (
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <p className="text-blue-800 text-xs">
+                Enter <strong>your details</strong> here. You'll add your loved one next.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                First name
+                Your first name
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -241,7 +247,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
             <div>
               <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                Last name
+                Your last name
               </label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -260,7 +266,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-              Email address
+              Your email
             </label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -278,7 +284,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
           <div>
             <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-              Phone number
+              Your phone
             </label>
             <div className="flex">
               <select
@@ -310,12 +316,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               <p className="mt-1 text-sm text-red-600">{phoneError}</p>
             )}
             <p className="mt-1 text-xs text-gray-500">
-              Format: {countryCode === '+1' ? '+15551234567' : countryCode === '+31' ? '+31612345678' : '+447123456789'} (no spaces or special characters)
+              Format: {countryCode === '+1' ? '+15551234567' : countryCode === '+31' ? '+31612345678' : '+447123456789'}
             </p>
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="password" title="At least 6 characters" className="block text-sm font-medium text-gray-700 mb-2">
               Password
             </label>
             <div className="relative">
@@ -392,10 +398,10 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           )}
 
           <div className="space-y-4">
-             <p className="text-xs text-gray-500 text-center">
-              By clicking "Create account", you agree to our{' '}
+            <p className="text-[11px] text-gray-500 text-center px-4 leading-relaxed">
+              By joining, you agree to our{' '}
               <Link href="/terms" target="_blank" className="text-blue-600 hover:underline">
-                Terms and Conditions
+                Terms
               </Link>{' '}
               and{' '}
               <Link href="/privacy" target="_blank" className="text-blue-600 hover:underline">
