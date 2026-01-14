@@ -658,6 +658,7 @@ export type Database = {
           personal_info: string | null
           phone: string
           preferences: Json | null
+          eva_communication_style: 'caring' | 'witty' | 'serious' | null
           updated_at: string
           user_id: string | null
         }
@@ -676,6 +677,7 @@ export type Database = {
           personal_info?: string | null
           phone: string
           preferences?: Json | null
+          eva_communication_style?: 'caring' | 'witty' | 'serious' | null
           updated_at?: string
           user_id?: string | null
         }

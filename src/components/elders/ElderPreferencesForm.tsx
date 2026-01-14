@@ -9,6 +9,7 @@ import type { Json } from '@/types/database'
 interface ElderPreferencesFormProps {
   elderId: string
   initialPreferences: Json | null
+  initialCommunicationStyle?: 'caring' | 'witty' | 'serious' | null
   onSave?: () => void
 }
 
@@ -211,7 +212,7 @@ const Section = ({
   </div>
 )
 
-export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: ElderPreferencesFormProps) {
+export function ElderPreferencesForm({ elderId, initialPreferences, initialCommunicationStyle, onSave }: ElderPreferencesFormProps) {
   const [preferences, setPreferences] = useState<ElderPreferences>(() => {
     if (!initialPreferences) return DEFAULT_PREFERENCES
     // Merge with default to ensure all keys exist
@@ -226,6 +227,9 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
       background: { ...DEFAULT_PREFERENCES.background, ...(initialPreferences as any)?.background },
     }
   })
+  const [communicationStyle, setCommunicationStyle] = useState<'caring' | 'witty' | 'serious'>(
+    (initialCommunicationStyle as any) || 'caring'
+  )
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [expandedSection, setExpandedSection] = useState<string | null>(null)
@@ -240,7 +244,10 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
       setFeedback(null)
       const { error } = await supabase
         .from('elders')
-        .update({ preferences: preferences as unknown as Json })
+        .update({ 
+          preferences: preferences as unknown as Json,
+          eva_communication_style: communicationStyle
+        })
         .eq('id', elderId)
 
       if (error) throw error
@@ -418,7 +425,7 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
         <Section title="Helpful Things" id="helpful_things" isExpanded={expandedSection === 'helpful_things'} onToggle={toggleSection}>
           <div className="grid gap-4 md:grid-cols-2">
             <StringInput 
-              label="Communication Style" 
+              label="Communication Notes" 
               value={preferences.helpful_things.communication_style} 
               onChange={(val) => updateField('helpful_things', 'communication_style', val)} 
             />
@@ -452,6 +459,41 @@ export function ElderPreferencesForm({ elderId, initialPreferences, onSave }: El
               items={preferences.background.life_highlights} 
               onChange={(val) => updateField('background', 'life_highlights', val)} 
             />
+          </div>
+        </Section>
+
+        <Section title="Advanced Settings" id="advanced" isExpanded={expandedSection === 'advanced'} onToggle={toggleSection}>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Eva's Communication Style</label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { id: 'caring', label: 'Caring', description: 'Warm & empathetic' },
+                  { id: 'witty', label: 'Witty', description: 'Cheerful & humorous' },
+                  { id: 'serious', label: 'Serious', description: 'Direct & professional' },
+                ].map((style) => (
+                  <button
+                    key={style.id}
+                    type="button"
+                    onClick={() => {
+                      setCommunicationStyle(style.id as any)
+                      if (feedback) setFeedback(null)
+                    }}
+                    className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${
+                      communicationStyle === style.id
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className="font-semibold text-sm">{style.label}</span>
+                    <span className="text-[10px] opacity-80 mt-0.5">{style.description}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                This setting changes how Eva talks. 'Caring' is recommended for most situations.
+              </p>
+            </div>
           </div>
         </Section>
       </div>

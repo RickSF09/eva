@@ -151,6 +151,8 @@ export default function B2CElderPage() {
   const [countryCode, setCountryCode] = useState<SupportedCountryCode>('+44')
   const [initialPreferences, setInitialPreferences] = useState<Json | null>(null)
 
+  const [initialCommunicationStyle, setInitialCommunicationStyle] = useState<'caring' | 'witty' | 'serious' | null>(null)
+
   const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(DEFAULT_SCHEDULE)
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const [scheduleSuccess, setScheduleSuccess] = useState<string | null>(null)
@@ -194,7 +196,7 @@ export default function B2CElderPage() {
 
         const { data: elder } = await supabase
           .from('elders')
-          .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info, preferences')
+          .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info, preferences, eva_communication_style')
           .eq('user_id', profile.id)
           .single()
 
@@ -212,6 +214,7 @@ export default function B2CElderPage() {
             personal_info: elder.personal_info ?? '',
           })
           setInitialPreferences(elder.preferences)
+          setInitialCommunicationStyle(elder.eva_communication_style)
           setCountryCode(detectCountryCodeFromE164(elder.phone))
           setPhoneError(null)
           fetchSchedules(elder.id)
@@ -220,6 +223,7 @@ export default function B2CElderPage() {
           setElderId(null)
           setForm(DEFAULT_ELDER)
           setInitialPreferences(null)
+          setInitialCommunicationStyle(null)
           setCountryCode('+44')
           setPhoneError(null)
           setSchedules([])
@@ -1557,7 +1561,11 @@ export default function B2CElderPage() {
 
       {elderId && (
         <section className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
-          <ElderPreferencesForm elderId={elderId} initialPreferences={initialPreferences} />
+          <ElderPreferencesForm 
+            elderId={elderId} 
+            initialPreferences={initialPreferences}
+            initialCommunicationStyle={initialCommunicationStyle}
+          />
         </section>
       )}
     </div>
