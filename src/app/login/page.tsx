@@ -1,7 +1,7 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { FormEvent, Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SignUpForm } from '@/components/auth/SignUpForm'
@@ -121,13 +121,36 @@ function MfaChallenge({
   )
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading } = useAuth()
   const [mode, setMode] = useState<'login' | 'signup'>('login')
   const [needsMfa, setNeedsMfa] = useState(false)
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null)
   const [mfaSetupError, setMfaSetupError] = useState('')
+
+  // Check if this is a password recovery flow
+  const isRecoveryFlow = () => {
+    // Check query params
+    const type = searchParams.get('type')
+    const code = searchParams.get('code')
+    const tokenHash = searchParams.get('token_hash')
+    
+    if (type === 'recovery' || code || tokenHash) {
+      return true
+    }
+    
+    // Also check URL hash (Supabase sometimes uses hash fragments)
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash
+      if (hash.includes('type=recovery') || hash.includes('access_token')) {
+        return true
+      }
+    }
+    
+    return false
+  }
 
   useEffect(() => {
     const checkAal = async () => {
@@ -139,6 +162,12 @@ export default function LoginPage() {
       }
 
       setMfaSetupError('')
+
+      // Check if this is a password recovery flow - redirect to reset page
+      if (isRecoveryFlow()) {
+        router.replace('/reset-password')
+        return
+      }
 
       try {
         const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -165,7 +194,19 @@ export default function LoginPage() {
     }
 
     void checkAal()
-  }, [user, loading, router])
+  }, [user, loading, router, searchParams])
+
+  // If recovery flow detected, show loading while redirecting
+  if (user && isRecoveryFlow()) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Redirecting to password reset...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -194,5 +235,17 @@ export default function LoginPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
+    }>
+      <LoginPageContent />
+    </Suspense>
   )
 }
