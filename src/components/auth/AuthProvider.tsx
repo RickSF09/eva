@@ -27,12 +27,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof window !== 'undefined') {
           const url = new URL(window.location.href)
           const hasCode = url.searchParams.get('code')
+          const tokenHash = url.searchParams.get('token_hash')
+          const type = url.searchParams.get('type')
           const hash = url.hash.startsWith('#') ? url.hash.substring(1) : ''
           const params = new URLSearchParams(hash)
           const access_token = params.get('access_token')
           const refresh_token = params.get('refresh_token')
 
-          if (access_token && refresh_token) {
+          // New password-reset PKCE flow: verify token_hash to create a session
+          if (tokenHash && type === 'recovery') {
+            const { data, error } = await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: 'recovery',
+            })
+            if (error) {
+              console.error('Failed to verify recovery token', error)
+            } else if (data?.session) {
+              window.history.replaceState({}, document.title, url.origin + url.pathname)
+            }
+          } else if (access_token && refresh_token) {
             await supabase.auth.setSession({ access_token, refresh_token })
             window.history.replaceState({}, document.title, url.origin + url.pathname)
           } else if (hasCode) {
@@ -78,4 +91,3 @@ export const useAuth = () => {
   }
   return context
 }
-
