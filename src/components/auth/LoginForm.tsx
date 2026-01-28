@@ -56,7 +56,11 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
       const baseUrl =
         process.env.NEXT_PUBLIC_APP_URL ||
         (typeof window !== 'undefined' ? window.location.origin : null)
-      const redirectTo = baseUrl ? `${baseUrl}/reset-password` : undefined
+      
+      // Use the server-side callback for the reset flow to handle PKCE exchange properly
+      const redirectTo = baseUrl 
+        ? `${baseUrl}/api/auth/callback?next=/reset-password` 
+        : undefined
 
       const { error } = await supabase.auth.resetPasswordForEmail(
         trimmedEmail,
