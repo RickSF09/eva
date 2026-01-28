@@ -56,7 +56,7 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
       const baseUrl =
         process.env.NEXT_PUBLIC_APP_URL ||
         (typeof window !== 'undefined' ? window.location.origin : null)
-      const redirectTo = baseUrl ? `${baseUrl}/login` : undefined
+      const redirectTo = baseUrl ? `${baseUrl}/reset-password` : undefined
 
       const { error } = await supabase.auth.resetPasswordForEmail(
         trimmedEmail,
