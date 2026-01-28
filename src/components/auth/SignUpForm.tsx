@@ -2,16 +2,8 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Link from 'next/link'
-import {
-  composeE164,
-  detectCountryCodeFromE164,
-  getNationalNumber,
-  sanitizeDigits,
-  validateE164,
-  type SupportedCountryCode,
-} from '@/lib/phone'
 
 interface SignUpFormProps {
   onToggleMode: () => void
@@ -23,52 +15,22 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     password: '',
     firstName: '',
     lastName: '',
-    phone: '',
     accountType: 'b2c' as 'b2b' | 'b2c',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [countryCode, setCountryCode] = useState<SupportedCountryCode>('+44')
-  const [phoneError, setPhoneError] = useState<string | null>(null)
   
   // Consent checkboxes
   const [familyConsent, setFamilyConsent] = useState(false)
   const [callRecordingNotified, setCallRecordingNotified] = useState(false)
   const [healthDataConsent, setHealthDataConsent] = useState(false)
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = sanitizeDigits(e.target.value)
-    const full = composeE164(countryCode, digits)
-    setFormData({ ...formData, phone: full })
-    setPhoneError(full ? validateE164(full, countryCode) : null)
-    setError('') // Clear general error when user types
-  }
-
-  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextCode = e.target.value as SupportedCountryCode
-    setCountryCode(nextCode)
-    const digits = sanitizeDigits(getNationalNumber(formData.phone, detectCountryCodeFromE164(formData.phone, nextCode)))
-    const full = composeE164(nextCode, digits)
-    setFormData({ ...formData, phone: full })
-    setPhoneError(full ? validateE164(full, nextCode) : null)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
-
-    // Validate phone number if provided
-    if (formData.phone) {
-      const validationError = validateE164(formData.phone, countryCode)
-      if (validationError) {
-        setPhoneError(validationError)
-        setLoading(false)
-        return
-      }
-    }
     
     // Validate consents
     if (!healthDataConsent) {
@@ -101,7 +63,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
-            phone: formData.phone,
             account_type: formData.accountType,
           },
         },
@@ -122,7 +83,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               email: formData.email,
               first_name: formData.firstName,
               last_name: formData.lastName,
-              phone: formData.phone,
               account_type: formData.accountType,
               terms_privacy_consent: true,
               terms_privacy_consent_timestamp: new Date().toISOString(),
@@ -280,44 +240,6 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                 required
               />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-              Your phone
-            </label>
-            <div className="flex">
-              <select
-                value={countryCode}
-                onChange={handleCountryChange}
-                className="px-3 py-3 border border-r-0 border-gray-200 rounded-l-xl bg-gray-50 text-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors appearance-none cursor-pointer"
-                style={{ height: '48px' }}
-              >
-                <option value="+1">🇺🇸 +1</option>
-                <option value="+31">🇳🇱 +31</option>
-                <option value="+44">🇬🇧 +44</option>
-              </select>
-              <div className="relative flex-1">
-                <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  id="phone"
-                  type="tel"
-                  value={getNationalNumber(formData.phone, countryCode)}
-                  onChange={handlePhoneChange}
-                  className={`w-full pl-10 pr-4 py-3 border border-l-0 border-gray-200 rounded-r-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
-                    phoneError ? 'border-red-300' : ''
-                  }`}
-                  style={{ height: '48px' }}
-                  placeholder={countryCode === '+1' ? '5551234567' : countryCode === '+31' ? '612345678' : '7123456789'}
-                />
-              </div>
-            </div>
-            {phoneError && (
-              <p className="mt-1 text-sm text-red-600">{phoneError}</p>
-            )}
-            <p className="mt-1 text-xs text-gray-500">
-              Format: {countryCode === '+1' ? '+15551234567' : countryCode === '+31' ? '+31612345678' : '+447123456789'}
-            </p>
           </div>
 
           <div>

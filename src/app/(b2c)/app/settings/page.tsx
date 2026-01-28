@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { SubscriptionManager } from '@/components/billing/SubscriptionManager'
+import { TwoFactorSettings } from '@/components/auth/TwoFactorSettings'
 
 interface ProfileForm {
   first_name: string
@@ -632,33 +633,44 @@ export default function B2CSettingsPage() {
             <h2 className="text-lg font-semibold text-slate-900">Security</h2>
           </div>
 
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={handlePasswordReset}
-              disabled={resettingPassword}
-              className="w-full text-left rounded-lg border border-slate-200 px-4 py-3 text-sm text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100"
-            >
-              <div className="font-medium text-slate-900">Change Password</div>
-              <div className="text-xs text-slate-500">Update your account password.</div>
-            </button>
-            {resetPasswordStatus && (
-              <p
-                className={`text-sm rounded-lg border px-3 py-2 ${
-                  resetPasswordStatus.type === 'success'
-                    ? 'border-green-100 bg-green-50 text-green-700'
-                    : 'border-red-100 bg-red-50 text-red-700'
-                }`}
-              >
-                {resetPasswordStatus.message}
-              </p>
-            )}
-
-            <div>
-              <p className="text-sm text-slate-600 mb-1">Two-Factor Authentication</p>
-              <p className="text-xs text-slate-500">Add an extra layer of security.</p>
+          <div className="space-y-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Change Password</p>
+                  <p className="text-xs text-slate-600">Update your account password.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePasswordReset}
+                  disabled={resettingPassword}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resettingPassword ? 'Sending…' : 'Send reset link'}
+                </button>
+              </div>
+              {resetPasswordStatus && (
+                <p
+                  className={`mt-3 text-sm rounded-lg border px-3 py-2 ${
+                    resetPasswordStatus.type === 'success'
+                      ? 'border-green-100 bg-green-50 text-green-700'
+                      : 'border-red-100 bg-red-50 text-red-700'
+                  }`}
+                >
+                  {resetPasswordStatus.message}
+                </p>
+              )}
             </div>
-            <div className="pt-2">
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <TwoFactorSettings />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Sign Out</p>
+                <p className="text-xs text-slate-600">End your session securely.</p>
+              </div>
               <button
                 type="button"
                 onClick={handleSignOut}
@@ -673,5 +685,3 @@ export default function B2CSettingsPage() {
     </div>
   )
 }
-
-

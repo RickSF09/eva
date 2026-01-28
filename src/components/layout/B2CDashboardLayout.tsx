@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/AuthProvider'
 import { useB2COnboardingSnapshot } from '@/hooks/useB2COnboarding'
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 
 interface B2CDashboardLayoutProps {
   children: React.ReactNode
@@ -19,12 +20,47 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
     isComplete: onboardingComplete,
   } = useB2COnboardingSnapshot({ enabled: Boolean(user) })
   const [redirecting, setRedirecting] = useState(false)
+  const [mfaChecking, setMfaChecking] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
       router.replace('/login')
     }
   }, [loading, user, router])
+
+  // Enforce AAL2 if a factor is enabled (Supabase exposes desired level via nextLevel)
+  useEffect(() => {
+    if (loading || onboardingLoading) return
+    if (!user) return
+
+    let active = true
+    const checkAal = async () => {
+      setMfaChecking(true)
+      try {
+        const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        if (!active) return
+        if (error) {
+          console.error('Failed to check MFA assurance level', error)
+          return
+        }
+        if (data?.nextLevel === 'aal2' && data?.currentLevel !== 'aal2') {
+          router.replace('/login?mfa=1')
+        }
+      } catch (err) {
+        if (active) {
+          console.error('Error enforcing MFA assurance level', err)
+        }
+      } finally {
+        if (active) setMfaChecking(false)
+      }
+    }
+
+    void checkAal()
+
+    return () => {
+      active = false
+    }
+  }, [user, loading, onboardingLoading, router])
 
   useEffect(() => {
     if (!user) {
@@ -42,7 +78,7 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
     }
   }, [user, pathname, onboardingLoading, onboardingComplete, router])
 
-  if (loading || (user && onboardingLoading)) {
+  if (loading || mfaChecking || (user && onboardingLoading)) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
