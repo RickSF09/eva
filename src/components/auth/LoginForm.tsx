@@ -14,11 +14,14 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setResetStatus(null)
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
@@ -33,6 +36,47 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setResetStatus({
+        type: 'error',
+        message: 'Enter your email above to receive a reset link.',
+      })
+      return
+    }
+
+    setResettingPassword(true)
+    setResetStatus(null)
+
+    try {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : null)
+      const redirectTo = baseUrl ? `${baseUrl}/login` : undefined
+
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        trimmedEmail,
+        redirectTo ? { redirectTo } : undefined
+      )
+
+      if (error) throw error
+
+      setResetStatus({
+        type: 'success',
+        message: 'We emailed you a password reset link.',
+      })
+    } catch (err) {
+      console.error('Failed to send password reset email', err)
+      setResetStatus({
+        type: 'error',
+        message: 'Unable to send reset email. Please try again.',
+      })
+    } finally {
+      setResettingPassword(false)
     }
   }
 
@@ -92,9 +136,41 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
             </div>
           </div>
 
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-500">Having trouble signing in?</span>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resettingPassword}
+              className="text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {resettingPassword ? 'Sending link…' : 'Forgot password?'}
+            </button>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3">
               <p className="text-red-600 text-sm">{error}</p>
+            </div>
+          )}
+
+          {resetStatus && (
+            <div
+              className={
+                resetStatus.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 rounded-xl p-3'
+                  : 'bg-red-50 border border-red-200 rounded-xl p-3'
+              }
+            >
+              <p
+                className={
+                  resetStatus.type === 'success'
+                    ? 'text-emerald-700 text-sm'
+                    : 'text-red-600 text-sm'
+                }
+              >
+                {resetStatus.message}
+              </p>
             </div>
           )}
 
@@ -122,4 +198,3 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
     </div>
   )
 }
-
