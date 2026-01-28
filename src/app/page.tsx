@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useOrganizations } from '@/hooks/useOrganizations'
 import { LoginForm } from '@/components/auth/LoginForm'
@@ -13,13 +13,42 @@ type AccountType = 'b2b' | 'b2c'
 
 export default function Home() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const { organizations, loading: orgLoading } = useOrganizations()
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [accountType, setAccountType] = useState<AccountType | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
 
+  // Check for password reset flow before any other logic
   useEffect(() => {
+    // If we have a recovery code/token, user should be on reset-password page
+    // This handles cases where Supabase redirects to home but preserves query params
+    const type = searchParams.get('type')
+    const code = searchParams.get('code')
+    const tokenHash = searchParams.get('token_hash') // for implicit flow
+    
+    // Check if we just came from a reset flow (sometimes hash is used)
+    const isRecovery = type === 'recovery' || !!code || !!tokenHash
+
+    if (isRecovery) {
+       router.replace('/reset-password')
+    }
+  }, [searchParams, router])
+
+  useEffect(() => {
+    // If checking for recovery, skip normal redirect? 
+    // Wait, the above effect runs. If it redirects, this one might still run if not cancelled?
+    // But router.replace triggers navigation.
+    
+    // Let's refine the logic to prevent race conditions.
+    const type = searchParams.get('type')
+    const code = searchParams.get('code')
+    const tokenHash = searchParams.get('token_hash')
+    const isRecovery = type === 'recovery' || !!code || !!tokenHash
+    
+    if (isRecovery) return
+
     if (!user) {
       setAccountType(null)
       return
@@ -58,6 +87,13 @@ export default function Home() {
   }, [user])
 
   useEffect(() => {
+    const type = searchParams.get('type')
+    const code = searchParams.get('code')
+    const tokenHash = searchParams.get('token_hash')
+    const isRecovery = type === 'recovery' || !!code || !!tokenHash
+    
+    if (isRecovery) return
+
     if (!user || authLoading || profileLoading) {
       return
     }
@@ -69,7 +105,7 @@ export default function Home() {
         router.replace('/b2b/dashboard')
       }
     }
-  }, [user, authLoading, profileLoading, accountType, orgLoading, organizations.length, router])
+  }, [user, authLoading, profileLoading, accountType, orgLoading, organizations.length, router, searchParams])
 
   const showOrganizationSetup = useMemo(() => {
     return (
@@ -81,6 +117,21 @@ export default function Home() {
       organizations.length === 0
     )
   }, [user, accountType, authLoading, profileLoading, orgLoading, organizations.length])
+
+  // If handling recovery flow, show spinner while redirecting
+  const type = searchParams.get('type')
+  const isRecovery = type === 'recovery' || !!searchParams.get('code') || !!searchParams.get('token_hash')
+  
+  if (isRecovery) {
+     return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-slate-900 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Redirecting to password reset...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (authLoading || profileLoading || (accountType === 'b2b' && orgLoading)) {
     return (
