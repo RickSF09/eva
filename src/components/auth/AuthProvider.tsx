@@ -16,6 +16,9 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
 })
 
+// Module-level promise to dedup token exchange
+let authExchangePromise: Promise<void> | null = null
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -34,23 +37,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const access_token = params.get('access_token')
           const refresh_token = params.get('refresh_token')
 
-          // New password-reset PKCE flow: verify token_hash to create a session
-          if (tokenHash && type === 'recovery') {
-            const { data, error } = await supabase.auth.verifyOtp({
-              token_hash: tokenHash,
-              type: 'recovery',
-            })
-            if (error) {
-              console.error('Failed to verify recovery token', error)
-            } else if (data?.session) {
-              window.history.replaceState({}, document.title, url.origin + url.pathname)
+          const needsExchange = (tokenHash && type === 'recovery') || (access_token && refresh_token) || hasCode
+
+          if (needsExchange) {
+            if (!authExchangePromise) {
+              authExchangePromise = (async () => {
+                try {
+                  // New password-reset PKCE flow: verify token_hash to create a session
+                  if (tokenHash && type === 'recovery') {
+                    const { data, error } = await supabase.auth.verifyOtp({
+                      token_hash: tokenHash,
+                      type: 'recovery',
+                    })
+                    if (error) {
+                      console.error('Failed to verify recovery token', error)
+                    } else if (data?.session) {
+                      window.history.replaceState({}, document.title, url.origin + url.pathname)
+                    }
+                  } else if (access_token && refresh_token) {
+                    await supabase.auth.setSession({ access_token, refresh_token })
+                    window.history.replaceState({}, document.title, url.origin + url.pathname)
+                  } else if (hasCode) {
+                    const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+                    if (error) {
+                      console.error('Failed to exchange code for session', error)
+                    } else {
+                      window.history.replaceState({}, document.title, url.origin + url.pathname)
+                    }
+                  }
+                } catch (err) {
+                  console.error('Auth exchange error:', err)
+                } finally {
+                   // Keep the promise set so we don't try again immediately? 
+                   // Or clear it? 
+                   // If we clear it, a re-mount with same URL (if cleanup failed) might retry.
+                   // But we should have cleaned the URL.
+                   // Let's clear it after a short delay or just leave it?
+                   // Better to clear it if we want to allow future exchanges (e.g. if user navigates away and back with new code).
+                   // But for this session/load, it's done.
+                   authExchangePromise = null
+                }
+              })()
             }
-          } else if (access_token && refresh_token) {
-            await supabase.auth.setSession({ access_token, refresh_token })
-            window.history.replaceState({}, document.title, url.origin + url.pathname)
-          } else if (hasCode) {
-            await supabase.auth.exchangeCodeForSession(window.location.href)
-            window.history.replaceState({}, document.title, url.origin + url.pathname)
+            await authExchangePromise
           }
         }
 
