@@ -53,21 +53,25 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
     setResetStatus(null)
 
     try {
+      // Use server-side admin request to generate link (avoids PKCE cross-device issues)
       const baseUrl =
         process.env.NEXT_PUBLIC_APP_URL ||
         (typeof window !== 'undefined' ? window.location.origin : null)
       
-      // Use the server-side callback for the reset flow to handle PKCE exchange properly
       const redirectTo = baseUrl 
         ? `${baseUrl}/api/auth/callback?next=/reset-password` 
         : undefined
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        trimmedEmail,
-        redirectTo ? { redirectTo } : undefined
-      )
+      const response = await fetch('/api/auth/request-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, redirectTo }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to request password reset')
+      }
 
       setResetStatus({
         type: 'success',

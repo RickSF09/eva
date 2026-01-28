@@ -13,14 +13,13 @@ export async function GET(request: Request) {
     
     if (!error) {
       // Forward to the next path
-      // We clean up the URL by not including the code
       return NextResponse.redirect(`${origin}${next}`)
     } else {
         console.error('Auth code exchange error:', error)
+        return NextResponse.redirect(`${origin}/login?error=AuthCodeExchangeError&message=${encodeURIComponent(error.message)}`)
     }
   }
 
   // Return the user to an error page with instructions
-  // For now, redirect to login with error param
-  return NextResponse.redirect(`${origin}/login?error=AuthCodeError`)
+  return NextResponse.redirect(`${origin}/login?error=NoCodeFound`)
 }
