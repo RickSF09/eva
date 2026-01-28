@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useOrganizations } from '@/hooks/useOrganizations'
@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase'
 
 type AccountType = 'b2b' | 'b2c'
 
-export default function Home() {
+function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
@@ -37,10 +37,6 @@ export default function Home() {
   }, [searchParams, router])
 
   useEffect(() => {
-    // If checking for recovery, skip normal redirect? 
-    // Wait, the above effect runs. If it redirects, this one might still run if not cancelled?
-    // But router.replace triggers navigation.
-    
     // Let's refine the logic to prevent race conditions.
     const type = searchParams.get('type')
     const code = searchParams.get('code')
@@ -84,7 +80,7 @@ export default function Home() {
     return () => {
       active = false
     }
-  }, [user])
+  }, [user, searchParams])
 
   useEffect(() => {
     const type = searchParams.get('type')
@@ -172,3 +168,14 @@ export default function Home() {
   )
 }
 
+export default function Home() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+      </div>
+    }>
+      <HomeContent />
+    </Suspense>
+  )
+}
