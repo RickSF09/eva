@@ -38,6 +38,7 @@ export function TwoFactorSettings() {
   const [code, setCode] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   const statusLabel = useMemo(() => {
     if (loading) return 'Checking…'
@@ -86,8 +87,45 @@ export function TwoFactorSettings() {
       }
       setEnrollData(data as EnrollData)
       setTotpFactor(null)
-    } catch (err) {
-      console.error('Failed to start TOTP enrollment', err)
+    } catch (err: any) {
+      const errorMessage = typeof err?.message === 'string' ? err.message : ''
+      const status = err?.status ?? err?.code
+
+      if (status === 422 || errorMessage.toLowerCase().includes('already exists')) {
+        try {
+          const { data, error } = await supabase.auth.mfa.listFactors()
+          if (error) throw error
+          const totpFactors = extractTotpFactors(data)
+          const verified = totpFactors.find((f) => f.status === 'verified')
+          if (verified) {
+            setTotpFactor(verified)
+            setEnrollData(null)
+            setMessage('Two-factor is already enabled for your account.')
+            return
+          }
+
+          const unverified = totpFactors.find((f) => f.status !== 'verified')
+          if (unverified?.id) {
+            await supabase.auth.mfa.unenroll({ factorId: unverified.id })
+            const retry = await supabase.auth.mfa.enroll({
+              factorType: 'totp',
+              friendlyName: 'Authenticator app',
+            })
+            if (retry.error) throw retry.error
+            if (!retry.data?.id || !retry.data?.totp) {
+              throw new Error('Missing enrollment data')
+            }
+            setEnrollData(retry.data as EnrollData)
+            setTotpFactor(null)
+            setMessage('Previous setup was reset. Scan the new QR code to continue.')
+            return
+          }
+        } catch (innerErr) {
+          console.error('Failed to recover from existing 2FA factor', innerErr)
+        }
+      }
+
+      console.error('Failed to start 2FA enrollment', err)
       setError('Could not start two-factor setup. Please try again.')
     } finally {
       setWorking(false)
@@ -158,15 +196,49 @@ export function TwoFactorSettings() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-        <div className="space-y-1">
-          <p className="text-sm font-semibold text-slate-900">Authenticator app (TOTP)</p>
-          <p className="text-xs text-slate-600">Use a 6-digit code from an authenticator app at sign in.</p>
+      {!enrollData && (
+          <button
+            type="button"
+            onClick={async () => {
+            if (totpFactor) {
+              const confirmed = window.confirm('Turn off two-factor authentication?')
+              if (!confirmed) return
+              await disableTotp()
+              return
+            }
+            await startEnrollment()
+          }}
+          disabled={working || loading}
+          className="flex w-full flex-col gap-2 text-left text-sm text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-900">Authenticator app (2FA)</p>
+                <p className="text-xs text-slate-600">Use a 6-digit code from an authenticator app at sign in.</p>
+              </div>
+            <span className="inline-flex items-center self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+              {statusLabel}
+            </span>
+          </div>
+          {totpFactor && (
+            <span className="text-sm text-slate-700">
+              Two-factor is turned on. You’ll be asked for a code when signing in.
+            </span>
+          )}
+        </button>
+      )}
+
+      {enrollData && (
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-slate-900">Authenticator app (2FA)</p>
+            <p className="text-xs text-slate-600">Use a 6-digit code from an authenticator app at sign in.</p>
+          </div>
+          <span className="inline-flex items-center self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+            {statusLabel}
+          </span>
         </div>
-        <span className="inline-flex items-center self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
-          {statusLabel}
-        </span>
-      </div>
+      )}
 
       {error && (
         <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -196,11 +268,21 @@ export function TwoFactorSettings() {
 
           {enrollData.totp?.qr_code && (
             <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-6">
-              <img
-                src={enrollData.totp.qr_code}
-                alt="Authenticator QR code"
-                className="h-32 w-32 rounded-lg border border-slate-200 bg-white p-2"
-              />
+              <button
+                type="button"
+                onClick={() => setQrOpen(true)}
+                className="group relative h-32 w-32 rounded-lg border border-slate-200 bg-white p-2 transition hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="Enlarge QR code"
+              >
+                <img
+                  src={enrollData.totp.qr_code}
+                  alt="Authenticator QR code"
+                  className="h-full w-full rounded-md object-contain transition-transform group-hover:scale-105"
+                />
+                <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-slate-600 shadow">
+                  Click
+                </span>
+              </button>
               <div className="space-y-2">
                 <p className="text-xs text-slate-500">Can’t scan? Enter this key manually:</p>
                 <code className="block w-full rounded-lg bg-white px-3 py-2 text-sm font-mono text-slate-800 border border-slate-200">
@@ -244,37 +326,31 @@ export function TwoFactorSettings() {
         </div>
       )}
 
-      {/* Default view */}
-      {!enrollData && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-slate-700">
-            {totpFactor
-              ? 'Two-factor is turned on. You’ll be asked for a code when signing in.'
-              : 'Add an authenticator app to require a code when signing in.'}
-          </div>
-          <div className="flex gap-2">
-            {totpFactor ? (
-              <button
-                type="button"
-                onClick={disableTotp}
-                disabled={working || loading}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {working ? 'Turning off…' : 'Turn off'}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={startEnrollment}
-                disabled={working || loading}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-              >
-                {working ? 'Starting…' : 'Enable 2FA'}
-              </button>
-            )}
+      {qrOpen && enrollData?.totp?.qr_code && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-6">
+          <button
+            type="button"
+            className="absolute inset-0 h-full w-full cursor-default"
+            aria-label="Close QR code preview"
+            onClick={() => setQrOpen(false)}
+          />
+          <div className="relative z-10 rounded-2xl bg-white p-4 shadow-xl">
+            <button
+              type="button"
+              onClick={() => setQrOpen(false)}
+              className="absolute right-3 top-3 rounded-full border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Close
+            </button>
+            <img
+              src={enrollData.totp.qr_code}
+              alt="Authenticator QR code enlarged"
+              className="h-72 w-72 rounded-lg bg-white object-contain p-2"
+            />
           </div>
         </div>
       )}
+
     </div>
   )
 }

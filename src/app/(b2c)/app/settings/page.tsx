@@ -634,24 +634,21 @@ export default function B2CSettingsPage() {
           </div>
 
           <div className="space-y-5">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-              <div className="flex items-center justify-between gap-3">
+            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 px-0 py-0">
+              <button
+                type="button"
+                onClick={handlePasswordReset}
+                disabled={resettingPassword}
+                className="flex w-full items-center justify-between gap-3 rounded-xl border-none bg-transparent px-4 py-4 text-left transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
                 <div>
                   <p className="text-sm font-semibold text-slate-900">Change Password</p>
                   <p className="text-xs text-slate-600">Update your account password.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handlePasswordReset}
-                  disabled={resettingPassword}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {resettingPassword ? 'Sending…' : 'Send reset link'}
-                </button>
-              </div>
+              </button>
               {resetPasswordStatus && (
                 <p
-                  className={`mt-3 text-sm rounded-lg border px-3 py-2 ${
+                  className={`mx-4 mb-3 text-sm rounded-lg border px-3 py-2 ${
                     resetPasswordStatus.type === 'success'
                       ? 'border-green-100 bg-green-50 text-green-700'
                       : 'border-red-100 bg-red-50 text-red-700'
@@ -666,19 +663,16 @@ export default function B2CSettingsPage() {
               <TwoFactorSettings />
             </div>
 
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-left transition hover:bg-slate-100"
+            >
               <div>
                 <p className="text-sm font-semibold text-slate-900">Sign Out</p>
                 <p className="text-xs text-slate-600">End your session securely.</p>
               </div>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="text-sm font-medium text-red-600 hover:text-red-700"
-              >
-                Sign Out
-              </button>
-            </div>
+            </button>
           </div>
         </div>
       </div>
