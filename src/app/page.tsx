@@ -32,7 +32,9 @@ function HomeContent() {
     const isRecovery = type === 'recovery' || !!code || !!tokenHash
 
     if (isRecovery) {
-       router.replace('/reset-password')
+       // Preserve query parameters so the reset page can handle the exchange
+       const queryString = searchParams.toString()
+       router.replace(`/reset-password?${queryString}`)
     }
   }, [searchParams, router])
 

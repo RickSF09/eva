@@ -165,7 +165,8 @@ function LoginPageContent() {
 
       // Check if this is a password recovery flow - redirect to reset page
       if (isRecoveryFlow()) {
-        router.replace('/reset-password')
+        const params = searchParams.toString()
+        router.replace(`/reset-password?${params}`)
         return
       }
 
