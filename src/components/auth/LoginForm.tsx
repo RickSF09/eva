@@ -58,8 +58,9 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
         process.env.NEXT_PUBLIC_APP_URL ||
         (typeof window !== 'undefined' ? window.location.origin : null)
       
+      // Use dedicated reset-password callback route (query params can get lost in email links)
       const redirectTo = baseUrl 
-        ? `${baseUrl}/api/auth/callback?next=/reset-password` 
+        ? `${baseUrl}/api/auth/callback/reset-password` 
         : undefined
 
       const response = await fetch('/api/auth/request-reset', {
