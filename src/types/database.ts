@@ -267,6 +267,7 @@ export type Database = {
           frequency: string
           id: string
           max_retries: number | null
+          max_retries_action: 'email' | 'escalate' | null
           name: string | null
           org_id: string | null
           retry_after_minutes: number

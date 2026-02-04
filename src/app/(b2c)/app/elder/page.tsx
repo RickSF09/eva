@@ -54,6 +54,7 @@ interface ScheduleFormState {
   times: string[]
   retryAfter: number
   maxRetries: number
+  maxRetriesAction: 'email' | 'escalate'
   topics: string[]
 }
 
@@ -65,6 +66,7 @@ interface ScheduleSummary {
   days_of_week: number[] | null
   retry_after_minutes: number | null
   max_retries: number | null
+  max_retries_action: 'email' | 'escalate' | null
   description?: string | null
   checklist?: string[] | null
 }
@@ -107,6 +109,7 @@ const DEFAULT_SCHEDULE: ScheduleFormState = {
   times: ['09:00'],
   retryAfter: 30,
   maxRetries: 2,
+  maxRetriesAction: 'email',
   topics: [],
 }
 
@@ -260,6 +263,7 @@ export default function B2CElderPage() {
             days_of_week,
             retry_after_minutes,
             max_retries,
+            max_retries_action,
             checklist
           )
         `)
@@ -283,6 +287,7 @@ export default function B2CElderPage() {
             days_of_week: Array.isArray(schedule.days_of_week) ? schedule.days_of_week : null,
             retry_after_minutes: schedule.retry_after_minutes ?? null,
             max_retries: schedule.max_retries ?? null,
+            max_retries_action: schedule.max_retries_action ?? null,
             checklist: Array.isArray(schedule.checklist) ? schedule.checklist : null,
           } as ScheduleSummary
         })
@@ -473,6 +478,7 @@ export default function B2CElderPage() {
       times: schedule.call_times,
       retryAfter: schedule.retry_after_minutes ?? 30,
       maxRetries: schedule.max_retries ?? 2,
+      maxRetriesAction: schedule.max_retries_action ?? 'email',
       topics: schedule.checklist || [],
     })
     setScheduleSuccess(null)
@@ -540,6 +546,7 @@ export default function B2CElderPage() {
             checklist,
             retry_after_minutes: scheduleForm.retryAfter,
             max_retries: scheduleForm.maxRetries,
+            max_retries_action: scheduleForm.maxRetriesAction,
           })
           .eq('id', editingScheduleId)
 
@@ -596,6 +603,7 @@ export default function B2CElderPage() {
             checklist,
             retry_after_minutes: scheduleForm.retryAfter,
             max_retries: scheduleForm.maxRetries,
+            max_retries_action: scheduleForm.maxRetriesAction,
             active: true,
             org_id: null,
             schedule_type: 'b2c',
@@ -1406,7 +1414,7 @@ export default function B2CElderPage() {
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700">Retry settings</p>
                 <p className="text-xs text-slate-500">Retries if call isn't answered</p>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <label className="text-sm text-slate-600">
                     Retry after (minutes)
                     <input
@@ -1429,6 +1437,18 @@ export default function B2CElderPage() {
                       onChange={(event) => updateScheduleForm({ maxRetries: Number(event.target.value) || 0 })}
                       className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                     />
+                  </label>
+
+                  <label className="text-sm text-slate-600">
+                    Action after max retries
+                    <select
+                      value={scheduleForm.maxRetriesAction}
+                      onChange={(event) => updateScheduleForm({ maxRetriesAction: event.target.value as 'email' | 'escalate' })}
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                    >
+                      <option value="email">Email</option>
+                      <option value="escalate">Call emergency contacts</option>
+                    </select>
                   </label>
                 </div>
               </div>
