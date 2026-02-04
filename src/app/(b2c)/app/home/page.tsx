@@ -831,6 +831,7 @@ export default function B2CHomePage() {
                   ? `${Math.round(moodValue * 100)}%`
                   : report.mood_assessment || 'N/A'
                 const callTypeInfo = report.call_executions?.call_type ? getCallTypeInfo(report.call_executions.call_type) : null
+                const isPostponed = (report.call_status || '').toLowerCase() === 'postponed'
 
                 return (
                   <button
@@ -868,6 +869,12 @@ export default function B2CHomePage() {
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               Escalated
+                            </span>
+                          )}
+                          {isPostponed && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Postponed
                             </span>
                           )}
                           <span className="text-xs text-slate-600">
@@ -948,5 +955,4 @@ export default function B2CHomePage() {
     </div>
   )
 }
-
 
