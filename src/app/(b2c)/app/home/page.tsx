@@ -75,7 +75,15 @@ export default function B2CHomePage() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [elder, setElder] = useState<Elder | null>(null)
-  const [callReports, setCallReports] = useState<CallReport[]>([])
+  
+  // Data for charts and stats (last 30 days)
+  const [statsReports, setStatsReports] = useState<CallReport[]>([])
+  
+  // Data for the call history list (paginated)
+  const [historyReports, setHistoryReports] = useState<CallReport[]>([])
+  const [historyTotal, setHistoryTotal] = useState(0)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  
   const [selectedReport, setSelectedReport] = useState<CallReport | null>(null)
   const [analysis, setAnalysis] = useState<any | null>(null)
   const [activeRequests, setActiveRequests] = useState<any[]>([])
@@ -125,7 +133,8 @@ export default function B2CHomePage() {
         if (elderRecord) {
           setElder(elderRecord)
 
-          // Fetch recent call reports (last 30 days)
+          // Fetch recent call reports for STATS (last 30 days)
+          // This ensures the charts and quick stats reflect recent activity
           const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
           const { data: reports } = await supabase
             .from('post_call_reports')
@@ -133,16 +142,16 @@ export default function B2CHomePage() {
             .eq('elder_id', elderRecord.id)
             .gte('call_started_at', thirtyDaysAgo)
             .order('call_started_at', { ascending: false })
-            .limit(20)
-
-          const formattedReports = (reports || []).map(r => ({
+            // No limit here for stats, but 30 days window restricts it naturally
+            
+          const formattedStatsReports = (reports || []).map(r => ({
             ...r,
             call_executions: Array.isArray(r.call_executions) 
               ? (r.call_executions[0] || null) 
               : (r.call_executions || null)
           })) as CallReport[]
 
-          setCallReports(formattedReports)
+          setStatsReports(formattedStatsReports)
 
           // Fetch active requests
           const { data: requests } = await supabase
@@ -184,7 +193,9 @@ export default function B2CHomePage() {
           }
         } else {
           setElder(null)
-          setCallReports([])
+          setStatsReports([])
+          setHistoryReports([])
+          setHistoryTotal(0)
           setAnalysis(null)
           setActiveRequests([])
         }
@@ -201,6 +212,69 @@ export default function B2CHomePage() {
       active = false
     }
   }, [user])
+
+  // Fetch paginated history when page/filter changes
+  useEffect(() => {
+    if (!elder) return
+
+    let active = true
+    // Only show full loader on first load or filter change
+    // This prevents the list from disappearing and causing scroll jumps
+    if (historyReports.length === 0) {
+      setHistoryLoading(true)
+    } else {
+      // Just a background flag for the opacity transition
+      setHistoryLoading(true)
+    }
+
+    const fetchHistory = async () => {
+      try {
+        const from = (currentPage - 1) * itemsPerPage
+        const to = from + itemsPerPage - 1
+
+        let query = supabase
+          .from('post_call_reports')
+          .select('id, summary, call_started_at, call_ended_at, duration_seconds, mood_assessment, sentiment_score, call_status, escalation_triggered, escalation_data, tone_analysis, transcript, recording_url, recording_storage_path, execution_id, health_indicators, agenda_completion, elder_id, call_executions!inner(onboarding_call, call_type)', { count: 'exact' })
+          .eq('elder_id', elder.id)
+          .order('call_started_at', { ascending: false })
+          .range(from, to)
+
+        if (callTypeFilter !== 'all') {
+          query = query.eq('call_executions.call_type', callTypeFilter)
+        }
+
+        const { data: reports, count, error } = await query
+
+        if (!active) return
+
+        if (error) {
+          console.error('Error fetching history:', error)
+          return
+        }
+
+        const formattedReports = (reports || []).map(r => ({
+          ...r,
+          call_executions: Array.isArray(r.call_executions) 
+            ? (r.call_executions[0] || null) 
+            : (r.call_executions || null)
+        })) as CallReport[]
+
+        setHistoryReports(formattedReports)
+        if (count !== null) setHistoryTotal(count)
+
+      } catch (err) {
+        console.error('Failed to fetch history', err)
+      } finally {
+        if (active) setHistoryLoading(false)
+      }
+    }
+
+    fetchHistory()
+
+    return () => {
+      active = false
+    }
+  }, [elder, currentPage, callTypeFilter, itemsPerPage])
 
   const [resolvingId, setResolvingId] = useState<string | null>(null)
 
@@ -229,8 +303,8 @@ export default function B2CHomePage() {
   }
 
   const handleRequestClick = async (callId: string) => {
-    // If we have the report loaded in callReports, use that
-    const existingReport = callReports.find(r => r.id === callId)
+    // Check both lists for the report
+    const existingReport = historyReports.find(r => r.id === callId) || statsReports.find(r => r.id === callId)
     if (existingReport) {
       setSelectedReport(existingReport)
       return
@@ -337,7 +411,7 @@ export default function B2CHomePage() {
     const bucketsMood: Record<string, { sum: number; count: number; label: string }> = {}
     const bucketsTone: Record<string, { sum: number; count: number; label: string }> = {}
 
-    for (const r of callReports) {
+    for (const r of statsReports) {
       if (!r.call_started_at) continue
       const dt = parseISO(r.call_started_at)
       const keyDay = format(dt, 'yyyy-MM-dd')
@@ -378,32 +452,21 @@ export default function B2CHomePage() {
     tonePoints.sort((a, b) => (a.key < b.key ? -1 : 1))
 
     return { moodSeries: moodPoints, toneSeries: tonePoints }
-  }, [callReports, aggregation])
-
-  // Call type filtering and pagination logic for call history
-  const filteredReports = useMemo(() => {
-    if (callTypeFilter === 'all') {
-      return callReports
-    }
-    return callReports.filter(report => report.call_executions?.call_type === callTypeFilter)
-  }, [callReports, callTypeFilter])
+  }, [statsReports, aggregation])
 
   const activeFilterLabel = CALL_TYPE_FILTERS.find(opt => opt.value === callTypeFilter)?.label ?? 'All calls'
-  const totalPages = Math.ceil(filteredReports.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const paginatedReports = filteredReports.slice(startIndex, endIndex)
-  const showingStart = filteredReports.length > 0 ? startIndex + 1 : 0
-  const showingEnd = filteredReports.length > 0 ? Math.min(endIndex, filteredReports.length) : 0
+  const totalPages = Math.ceil(historyTotal / itemsPerPage)
+  const showingStart = historyTotal > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0
+  const showingEnd = historyTotal > 0 ? Math.min(currentPage * itemsPerPage, historyTotal) : 0
 
-  // Reset to page 1 when data set or filter changes
+  // Reset to page 1 when filter changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [callReports.length, callTypeFilter])
+  }, [callTypeFilter])
 
   // Calculate quick stats
   const quickStats = useMemo(() => {
-    if (callReports.length === 0) {
+    if (statsReports.length === 0) {
       return {
         totalCalls: 0,
         lastCallDate: null,
@@ -412,12 +475,12 @@ export default function B2CHomePage() {
       }
     }
 
-    const completedCalls = callReports.filter(r => {
+    const completedCalls = statsReports.filter(r => {
       const status = (r.call_status || '').toLowerCase()
       return ['completed', 'success', 'succeeded', 'completed_successfully'].includes(status) || !!r.call_ended_at
     })
 
-    const moods = callReports
+    const moods = statsReports
       .map(r => {
         const moodRaw = typeof r.mood_assessment === 'number' ? r.mood_assessment : parseFloat(String(r.mood_assessment ?? ''))
         return Number.isFinite(moodRaw) ? Math.max(0, Math.min(1, moodRaw)) : (typeof r.sentiment_score === 'number' ? Math.max(0, Math.min(1, r.sentiment_score)) : null)
@@ -428,16 +491,16 @@ export default function B2CHomePage() {
       ? Math.round((moods.reduce((a, b) => a + b, 0) / moods.length) * 100)
       : null
 
-    const lastCall = callReports[0] // Already sorted by date descending
+    const lastCall = statsReports[0] // Already sorted by date descending
     const lastCallDate = lastCall?.call_started_at ? format(parseISO(lastCall.call_started_at), 'MMM d, yyyy') : null
 
     return {
-      totalCalls: callReports.length,
+      totalCalls: statsReports.length,
       lastCallDate,
       averageMood,
-      escalations: callReports.filter(r => r.escalation_triggered).length,
+      escalations: statsReports.filter(r => r.escalation_triggered).length,
     }
-  }, [callReports])
+  }, [statsReports])
 
   if (loading) {
     return (
@@ -794,9 +857,9 @@ export default function B2CHomePage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Call History</h2>
-            {filteredReports.length > itemsPerPage && (
+            {historyTotal > itemsPerPage && (
               <span className="text-xs text-slate-500">
-                Showing {showingStart}-{showingEnd} of {filteredReports.length}
+                Showing {showingStart}-{showingEnd} of {historyTotal}
                 {callTypeFilter !== 'all' ? ` • ${activeFilterLabel}` : ''}
               </span>
             )}
@@ -819,11 +882,14 @@ export default function B2CHomePage() {
             </select>
           </div>
         </div>
-          {callReports.length > 0 ? (
-            filteredReports.length > 0 ? (
+          {historyLoading && historyReports.length === 0 ? (
+             <div className="flex justify-center py-8">
+               <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+             </div>
+          ) : historyReports.length > 0 ? (
               <>
-              <div className="mt-4 space-y-3">
-                {paginatedReports.map((report) => {
+              <div className={`mt-4 space-y-3 transition-opacity duration-200 ${historyLoading ? 'opacity-50' : 'opacity-100'}`}>
+                {historyReports.map((report) => {
                 const moodValue = typeof report.sentiment_score === 'number' 
                   ? report.sentiment_score 
                   : parseFloat(String(report.mood_assessment ?? ''))
@@ -897,7 +963,10 @@ export default function B2CHomePage() {
               {totalPages > 1 && (
                 <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
                   <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setCurrentPage(prev => Math.max(1, prev - 1))
+                    }}
                     disabled={currentPage === 1}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-700 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -912,7 +981,10 @@ export default function B2CHomePage() {
                   </div>
                   
                   <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      setCurrentPage(prev => Math.min(totalPages, prev + 1))
+                    }}
                     disabled={currentPage === totalPages}
                     className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-700 rounded-lg border border-slate-300 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
@@ -922,16 +994,10 @@ export default function B2CHomePage() {
                 </div>
               )}
             </>
-            ) : (
-              <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500">
-                <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
-                <p>No calls match the selected filter.</p>
-              </div>
-            )
           ) : (
             <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-slate-300 px-4 py-4 text-sm text-slate-500">
               <Clock className="h-5 w-5 text-slate-400 flex-shrink-0" />
-              <p>No calls have been completed yet. We&apos;ll show updates here once the first call finishes.</p>
+              <p>{callTypeFilter === 'all' ? "No calls have been completed yet. We'll show updates here once the first call finishes." : "No calls match the selected filter."}</p>
             </div>
           )}
       </section>
