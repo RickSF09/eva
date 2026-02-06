@@ -117,7 +117,9 @@ export default function B2CHomePage() {
         if (!active || !userRecord) {
           setProfile(null)
           setElder(null)
-          setCallReports([])
+          setStatsReports([])
+          setHistoryReports([])
+          setHistoryTotal(0)
           setActiveRequests([])
           return
         }
