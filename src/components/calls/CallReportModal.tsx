@@ -52,7 +52,7 @@ interface CallReportModalProps {
     } | null
   }
   onClose: () => void
-  onOpenReport?: Function
+  onOpenReport?: (...args: any[]) => void
 }
 
 export function CallReportModal({ report, onClose, onOpenReport }: CallReportModalProps) {
