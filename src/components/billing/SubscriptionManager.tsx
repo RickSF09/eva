@@ -429,14 +429,22 @@ export function SubscriptionManager() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            fetchSubscription()
+          onClick={async () => {
+            if (subscription.hasSubscription) {
+              setSyncing(true)
+              try {
+                await fetch('/api/stripe/sync-subscription', { method: 'POST' })
+              } finally {
+                setSyncing(false)
+              }
+            }
+            await fetchSubscription()
             refreshUsage()
           }}
           disabled={loading || syncing || usageLoading}
           className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Refresh
+          {syncing ? 'Syncing…' : 'Refresh'}
         </button>
       </div>
     </div>
