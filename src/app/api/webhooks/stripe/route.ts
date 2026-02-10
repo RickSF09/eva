@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getPlanByPriceId } from '@/config/plans'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,8 +18,12 @@ function ensureWebhookSecret() {
 async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
   const primaryItem = subscription.items.data.at(0)
+  const priceId = primaryItem?.price.id ?? null
 
-  // Access properties using type assertion to avoid TypeScript type issues
+  // Resolve the plan slug from our config; fall back to nickname, then price ID
+  const configPlan = getPlanByPriceId(priceId)
+  const planSlug = configPlan?.slug ?? primaryItem?.price.nickname ?? priceId
+
   const currentPeriodEnd = (subscription as any).current_period_end as number | undefined
   const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
 
@@ -27,7 +32,7 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
     .update({
       stripe_subscription_id: subscription.id,
       subscription_status: subscription.status,
-      subscription_plan: primaryItem?.price.nickname ?? primaryItem?.price.id ?? null,
+      subscription_plan: planSlug,
       subscription_current_period_end: currentPeriodEnd
         ? new Date(currentPeriodEnd * 1000).toISOString()
         : null,
@@ -44,7 +49,6 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
 
-  // Access properties using type assertion to avoid TypeScript type issues
   const endedAt = (subscription as any).ended_at as number | undefined
 
   const { error } = await supabaseAdmin
@@ -103,7 +107,7 @@ export async function POST(req: NextRequest) {
         break
       }
       default: {
-        // Ignore other events for now
+        // Ignore other events
         break
       }
     }
@@ -114,5 +118,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ received: true })
 }
-
-

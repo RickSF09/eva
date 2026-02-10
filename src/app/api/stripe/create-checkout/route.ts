@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { stripe } from '@/lib/stripe-server'
+import { TRIAL_PERIOD_DAYS } from '@/config/plans'
 
 const successPath = '/app/settings?billing=success'
 const canceledPath = '/app/settings?billing=cancelled'
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
 
     const { data: profile, error: profileError } = await supabase
       .from('users')
-      .select('id, stripe_customer_id')
+      .select('id, stripe_customer_id, stripe_subscription_id')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -62,12 +63,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const trialPeriodDays = parseInt(
-      process.env.STRIPE_TRIAL_PERIOD_DAYS ??
-        process.env.NEXT_PUBLIC_STRIPE_TRIAL_PERIOD_DAYS ??
-        '0',
-      10
-    )
+    // Only apply trial if the user has never had a subscription
+    const trialDays =
+      !profile.stripe_subscription_id && TRIAL_PERIOD_DAYS > 0
+        ? TRIAL_PERIOD_DAYS
+        : undefined
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       success_url: `${getAppUrl()}${successPath}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getAppUrl()}${canceledPath}`,
       subscription_data: {
-        trial_period_days: Number.isFinite(trialPeriodDays) && trialPeriodDays > 0 ? trialPeriodDays : undefined,
+        trial_period_days: trialDays,
         metadata: {
           supabase_user_id: profile.id,
         },
@@ -97,18 +97,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ sessionId: session.id, url: session.url })
   } catch (error) {
     console.error('Error creating checkout session:', error)
-    
-    // Provide more specific error messages for debugging
+
     let message = 'Unable to create checkout session'
     if (error instanceof Error) {
-      // Log the full error server-side
       console.error('Full error details:', {
         name: error.name,
         message: error.message,
         stack: error.stack,
       })
-      
-      // Check for common configuration issues
+
       if (error.message.includes('NEXT_PUBLIC_APP_URL')) {
         message = 'Server misconfiguration: NEXT_PUBLIC_APP_URL is not set'
       } else if (error.message.includes('STRIPE_SECRET_KEY')) {
@@ -117,12 +114,10 @@ export async function POST(req: NextRequest) {
         message = 'Invalid price ID. Please contact support.'
       }
     }
-    
+
     return NextResponse.json(
       { error: message },
       { status: 500 }
     )
   }
 }
-
-

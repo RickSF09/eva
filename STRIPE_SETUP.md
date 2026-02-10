@@ -79,9 +79,11 @@ STRIPE_SECRET_KEY=sk_test_...
 # Stripe Webhook Secret (from `stripe listen` command)
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Stripe Product Configuration
-NEXT_PUBLIC_STRIPE_DEFAULT_PRICE_ID=price_1SSiG2A8U0kV1kgtFkSTd9vO
-NEXT_PUBLIC_STRIPE_TRIAL_PERIOD_DAYS=14
+# Stripe Price IDs (one per plan tier)
+NEXT_PUBLIC_STRIPE_PRICE_ESSENTIAL=price_xxx
+NEXT_PUBLIC_STRIPE_PRICE_PEACE_OF_MIND=price_yyy
+NEXT_PUBLIC_STRIPE_PRICE_COMPLETE_CARE=price_zzz
+# Trial length & minutes are configured in src/config/plans.ts
 
 # App URL (for redirects)
 NEXT_PUBLIC_APP_URL=http://localhost:3000

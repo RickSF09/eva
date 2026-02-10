@@ -1,10 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { format } from 'date-fns'
+import { format, differenceInDays } from 'date-fns'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
+import { PricingCards } from '@/components/billing/PricingCards'
+import { useCallUsage } from '@/hooks/useCallUsage'
+import {
+  getPlanBySlug,
+  formatPrice,
+  getMinutesForPlan,
+  TRIAL_PERIOD_DAYS,
+  TRIAL_MINUTES,
+} from '@/config/plans'
 
 type SubscriptionStatus =
   | 'trialing'
@@ -34,13 +43,10 @@ const defaultSubscription: SubscriptionDetails = {
   hasSubscription: false,
 }
 
-const defaultPriceId = process.env.NEXT_PUBLIC_STRIPE_DEFAULT_PRICE_ID
-const trialPeriodDays = parseInt(process.env.NEXT_PUBLIC_STRIPE_TRIAL_PERIOD_DAYS ?? '0', 10)
-
 function formatStatus(status: SubscriptionStatus) {
   switch (status) {
     case 'trialing':
-      return 'Trialing'
+      return 'Free trial'
     case 'active':
       return 'Active'
     case 'past_due':
@@ -73,12 +79,14 @@ export function SubscriptionManager() {
   const searchParams = useSearchParams()
   const lastSyncedSessionIdRef = useRef<string | null>(null)
 
+  // Call usage tracking
+  const { usage, loading: usageLoading, refresh: refreshUsage } = useCallUsage()
+
+  // ---- URL param messages -------------------------------------------------
   useEffect(() => {
     const status = searchParams.get('billing')
 
-    if (!status) {
-      return
-    }
+    if (!status) return
 
     if (status === 'success') {
       setInfoMessage('Your subscription is active. Thank you for being part of Eva Cares!')
@@ -90,6 +98,7 @@ export function SubscriptionManager() {
     }
   }, [searchParams])
 
+  // ---- Fetch subscription --------------------------------------------------
   const fetchSubscription = useCallback(async () => {
     if (!user) return
 
@@ -135,17 +144,13 @@ export function SubscriptionManager() {
     fetchSubscription()
   }, [fetchSubscription, user])
 
+  // ---- Post-checkout sync --------------------------------------------------
   useEffect(() => {
     const status = searchParams.get('billing')
     const sessionId = searchParams.get('session_id')
 
-    if (!user || status !== 'success' || !sessionId || syncing) {
-      return
-    }
-
-    if (lastSyncedSessionIdRef.current === sessionId) {
-      return
-    }
+    if (!user || status !== 'success' || !sessionId || syncing) return
+    if (lastSyncedSessionIdRef.current === sessionId) return
 
     lastSyncedSessionIdRef.current = sessionId
 
@@ -186,6 +191,11 @@ export function SubscriptionManager() {
     return () => controller.abort()
   }, [fetchSubscription, searchParams, syncing, user])
 
+  // ---- Derived values ------------------------------------------------------
+  const isTrial = subscription.status === 'trialing'
+  const currentPlan = getPlanBySlug(subscription.plan)
+  const minutesIncluded = getMinutesForPlan(subscription.plan, isTrial)
+
   const nextBillingDate = useMemo(() => {
     if (!subscription.currentPeriodEnd) return null
     try {
@@ -195,11 +205,22 @@ export function SubscriptionManager() {
     }
   }, [subscription.currentPeriodEnd])
 
+  const trialDaysRemaining = useMemo(() => {
+    if (!isTrial || !subscription.currentPeriodEnd) return null
+    try {
+      const days = differenceInDays(new Date(subscription.currentPeriodEnd), new Date())
+      return Math.max(0, days)
+    } catch {
+      return null
+    }
+  }, [isTrial, subscription.currentPeriodEnd])
+
   const statusBadgeStyles = useMemo(() => {
     switch (subscription.status) {
       case 'active':
-      case 'trialing':
         return 'bg-green-100 text-green-800 border-green-200'
+      case 'trialing':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
       case 'past_due':
       case 'unpaid':
       case 'incomplete':
@@ -212,44 +233,7 @@ export function SubscriptionManager() {
     }
   }, [subscription.status])
 
-  const handleSubscribe = async () => {
-    if (!defaultPriceId) {
-      setErrorMessage('Stripe price ID is not configured. Please contact support.')
-      return
-    }
-
-    setActionLoading(true)
-    setErrorMessage(null)
-    setInfoMessage(null)
-    try {
-      const response = await fetch('/api/stripe/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: defaultPriceId }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Checkout session failed')
-      }
-
-      const data = await response.json()
-
-      if (data?.url) {
-        window.location.href = data.url as string
-        return
-      }
-
-      throw new Error('Checkout session missing redirect URL')
-    } catch (err) {
-      console.error('Failed to start Stripe Checkout', err)
-      setErrorMessage(
-        err instanceof Error ? err.message : 'Unable to start checkout. Please try again.'
-      )
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
+  // ---- Actions -------------------------------------------------------------
   const handleManageBilling = async () => {
     setActionLoading(true)
     setErrorMessage(null)
@@ -278,8 +262,29 @@ export function SubscriptionManager() {
     }
   }
 
+  // ---- Render: no subscription → show pricing cards ------------------------
+  if (!loading && !subscription.hasSubscription && !syncing) {
+    return (
+      <div className="space-y-4">
+        {errorMessage && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </p>
+        )}
+        {infoMessage && (
+          <p className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+            {infoMessage}
+          </p>
+        )}
+        <PricingCards />
+      </div>
+    )
+  }
+
+  // ---- Render: has subscription → show details -----------------------------
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Subscription</h2>
@@ -293,14 +298,91 @@ export function SubscriptionManager() {
       </div>
 
       <div className="mt-6 space-y-4 text-sm text-slate-700">
-        {trialPeriodDays > 0 && (
-          <p className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-slate-700">
-            New subscriptions include a {trialPeriodDays}-day free trial. You can cancel anytime
-            before the trial ends.
-          </p>
+        {/* Trial banner */}
+        {isTrial && trialDaysRemaining !== null && (
+          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
+            <p className="font-medium text-blue-800">
+              Free trial &mdash; {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'}{' '}
+              remaining
+            </p>
+            <p className="mt-1 text-blue-700">
+              You have {TRIAL_MINUTES} trial minutes. Your{' '}
+              {currentPlan ? currentPlan.name : 'selected'} plan will start automatically when the
+              trial ends.
+            </p>
+          </div>
         )}
 
-        {subscription.plan && (
+        {/* Plan details */}
+        {currentPlan && (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
+              <p className="mt-1 font-medium text-slate-900">{currentPlan.name}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                {isTrial ? 'Trial minutes' : 'Minutes / month'}
+              </p>
+              <p className="mt-1 font-medium text-slate-900">{minutesIncluded}</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Price</p>
+              <p className="mt-1 font-medium text-slate-900">
+                {formatPrice(currentPlan.priceMonthly)}/mo
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Usage tracking */}
+        {!usageLoading && usage.minutesIncluded > 0 && (
+          <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-wide text-slate-500">
+                Minutes used this period
+              </p>
+              <p className="text-sm font-semibold text-slate-900">
+                {usage.minutesUsed} / {usage.minutesIncluded}
+              </p>
+            </div>
+            {/* Progress bar */}
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  usage.usagePercent >= 90
+                    ? 'bg-red-500'
+                    : usage.usagePercent >= 75
+                      ? 'bg-yellow-500'
+                      : 'bg-blue-500'
+                }`}
+                style={{ width: `${usage.usagePercent}%` }}
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <span>{usage.callCount} call{usage.callCount !== 1 ? 's' : ''} this period</span>
+              <span
+                className={
+                  usage.usagePercent >= 90
+                    ? 'font-medium text-red-600'
+                    : usage.usagePercent >= 75
+                      ? 'font-medium text-yellow-600'
+                      : ''
+                }
+              >
+                {usage.minutesRemaining} minute{usage.minutesRemaining !== 1 ? 's' : ''} remaining
+              </span>
+            </div>
+            {usage.usagePercent >= 90 && (
+              <p className="mt-2 text-xs font-medium text-red-600">
+                You&apos;re running low on minutes. Consider upgrading your plan.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Fallback for unrecognised plan slug */}
+        {!currentPlan && subscription.plan && (
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
             <p className="mt-1 font-medium text-slate-900">
@@ -309,7 +391,8 @@ export function SubscriptionManager() {
           </div>
         )}
 
-        {nextBillingDate && (
+        {/* Next billing date */}
+        {nextBillingDate && !isTrial && (
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Next billing date</p>
             <p className="mt-1 font-medium text-slate-900">{nextBillingDate}</p>
@@ -321,13 +404,7 @@ export function SubscriptionManager() {
           </div>
         )}
 
-        {!loading && !subscription.hasSubscription && !syncing && (
-          <p className="rounded-lg border border-amber-100 bg-amber-50 px-4 py-3 text-amber-800">
-            You do not have an active subscription yet. Subscribe to unlock the Eva Cares assistant
-            for your loved one.
-          </p>
-        )}
-
+        {/* Messages */}
         {errorMessage && (
           <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {errorMessage}
@@ -340,6 +417,7 @@ export function SubscriptionManager() {
         )}
       </div>
 
+      {/* Actions */}
       <div className="mt-6 flex flex-wrap gap-3">
         <button
           type="button"
@@ -347,20 +425,15 @@ export function SubscriptionManager() {
           disabled={loading || actionLoading || !subscription.hasSubscription}
           className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Manage billing
+          {isTrial ? 'Change plan' : 'Manage billing'}
         </button>
         <button
           type="button"
-          onClick={handleSubscribe}
-          disabled={loading || actionLoading || syncing}
-          className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-400"
-        >
-          {subscription.hasSubscription ? 'Update plan' : 'Subscribe now'}
-        </button>
-        <button
-          type="button"
-          onClick={fetchSubscription}
-          disabled={loading || syncing}
+          onClick={() => {
+            fetchSubscription()
+            refreshUsage()
+          }}
+          disabled={loading || syncing || usageLoading}
           className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Refresh
@@ -369,5 +442,3 @@ export function SubscriptionManager() {
     </div>
   )
 }
-
-

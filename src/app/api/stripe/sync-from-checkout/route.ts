@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe-server'
 import { createServerSupabase } from '@/lib/supabase-server'
+import { getPlanByPriceId } from '@/config/plans'
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,7 +75,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Always retrieve the full subscription object to ensure all properties are available
     const subscription = await stripe.subscriptions.retrieve(subscriptionId)
 
     if (!subscription) {
@@ -85,8 +85,12 @@ export async function POST(req: NextRequest) {
     }
 
     const primaryItem = subscription.items.data.at(0)
-    
-    // Access properties using bracket notation to avoid TypeScript type issues
+    const priceId = primaryItem?.price.id ?? null
+
+    // Resolve the plan slug from our config; fall back to nickname, then price ID
+    const configPlan = getPlanByPriceId(priceId)
+    const planSlug = configPlan?.slug ?? primaryItem?.price.nickname ?? priceId
+
     const currentPeriodEnd = (subscription as any).current_period_end as number | undefined
     const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
 
@@ -95,7 +99,7 @@ export async function POST(req: NextRequest) {
       .update({
         stripe_subscription_id: subscription.id,
         subscription_status: subscription.status,
-        subscription_plan: primaryItem?.price.nickname ?? primaryItem?.price.id ?? null,
+        subscription_plan: planSlug,
         subscription_current_period_end: currentPeriodEnd
           ? new Date(currentPeriodEnd * 1000).toISOString()
           : null,
@@ -114,7 +118,7 @@ export async function POST(req: NextRequest) {
       subscription: {
         id: subscription.id,
         status: subscription.status,
-        plan: primaryItem?.price.nickname ?? primaryItem?.price.id ?? null,
+        plan: planSlug,
         currentPeriodEnd: currentPeriodEnd
           ? new Date(currentPeriodEnd * 1000).toISOString()
           : null,
@@ -129,5 +133,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-
-

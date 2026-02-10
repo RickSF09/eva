@@ -22,7 +22,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { calculateNextScheduledTime, cn } from '@/lib/utils'
-import { SubscriptionManager } from '@/components/billing/SubscriptionManager'
+import { PricingCards } from '@/components/billing/PricingCards'
+import { TRIAL_PERIOD_DAYS, TRIAL_MINUTES, getPlanBySlug, formatPrice } from '@/config/plans'
 import {
   ONBOARDING_STEPS,
   type OnboardingStepId,
@@ -141,7 +142,7 @@ const DEFAULT_CONTACT_FORM: ContactFormState = {
   email: '',
 }
 
-const defaultPriceId = process.env.NEXT_PUBLIC_STRIPE_DEFAULT_PRICE_ID
+// Plan config is centralised in @/config/plans.ts
 
 export default function B2COnboardingPage() {
   const router = useRouter()
@@ -1510,18 +1511,17 @@ function BillingStep({
   onContinue: () => void
 }) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [action, setAction] = useState<'checkout' | 'portal' | null>(null)
-  const [showDetails, setShowDetails] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
 
   useEffect(() => {
     if (billingParam === 'success') {
-      setMessage({ type: 'success', text: 'Card added. Your trial is active.' })
+      setMessage({ type: 'success', text: 'Card added. Your free trial is active!' })
     } else if (billingParam === 'cancelled') {
-      setMessage({ type: 'error', text: 'Checkout cancelled. You can restart anytime.' })
+      setMessage({ type: 'error', text: 'Checkout cancelled. You can pick a plan anytime.' })
     } else if (billingParam === 'required') {
       setMessage({
         type: 'error',
-        text: 'An active subscription is required. Please add a payment method.',
+        text: 'An active subscription is required. Please choose a plan below.',
       })
     }
   }, [billingParam])
@@ -1530,40 +1530,11 @@ function BillingStep({
     ? format(new Date(snapshot.subscriptionPeriodEnd), 'PPP')
     : null
 
-  const handleCheckout = async () => {
-    if (!defaultPriceId) {
-      setMessage({
-        type: 'error',
-        text: 'Stripe price ID missing. Contact support.',
-      })
-      return
-    }
-
-    setAction('checkout')
-    setMessage(null)
-    try {
-      const response = await fetch('/api/stripe/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: defaultPriceId }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Unable to start checkout')
-      }
-
-      const data = await response.json()
-      window.location.href = data.url as string
-    } catch (err) {
-      console.error(err)
-      setMessage({ type: 'error', text: 'Checkout failed. Please try again.' })
-    } finally {
-      setAction(null)
-    }
-  }
+  const currentPlan = getPlanBySlug(snapshot.subscriptionPlan)
+  const isTrial = snapshot.subscriptionStatus === 'trialing'
 
   const handlePortal = async () => {
-    setAction('portal')
+    setPortalLoading(true)
     setMessage(null)
     try {
       const response = await fetch('/api/stripe/create-portal-session', { method: 'POST' })
@@ -1574,7 +1545,7 @@ function BillingStep({
       console.error(err)
       setMessage({ type: 'error', text: 'Billing portal unavailable. Please try again.' })
     } finally {
-      setAction(null)
+      setPortalLoading(false)
     }
   }
 
@@ -1584,23 +1555,30 @@ function BillingStep({
     <section className="rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-sm">
       <StepHeader
         title="Start Free Trial"
-        helper="Eva needs a card on file to place calls (free trial first)"
+        helper={`Choose a plan to begin your ${TRIAL_PERIOD_DAYS}-day free trial with ${TRIAL_MINUTES} minutes`}
         completed={completed}
         icon={<CreditCard className="h-5 w-5" />}
       />
 
       <div className="mt-5 space-y-4 text-sm text-slate-600">
-        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-          <p className="text-sm font-semibold text-slate-800">
-            Status: <span className="text-slate-900">{statusLabel}</span>
-          </p>
-          <p className="text-xs text-slate-500">
-            {trialEnds
-              ? `Trial ends ${trialEnds}. We'll remind you before any charges.`
-              : 'Add a card to unlock the 14-day free trial. No charges today.'}
-          </p>
-        </div>
+        {/* Status banner for users who already have a subscription */}
+        {snapshot.hasSubscription && (
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-800">
+              Status: <span className="text-slate-900">{statusLabel}</span>
+              {currentPlan && (
+                <span className="ml-2 text-slate-500">({currentPlan.name} &mdash; {formatPrice(currentPlan.priceMonthly)}/mo)</span>
+              )}
+            </p>
+            {isTrial && trialEnds && (
+              <p className="text-xs text-slate-500">
+                Trial ends {trialEnds}. You have {TRIAL_MINUTES} trial minutes. We&apos;ll remind you before any charges.
+              </p>
+            )}
+          </div>
+        )}
 
+        {/* Messages */}
         {message && (
           <div
             className={cn(
@@ -1619,64 +1597,45 @@ function BillingStep({
           </div>
         )}
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={handleCheckout}
-            disabled={Boolean(action)}
-            className="inline-flex flex-1 items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            {action === 'checkout' ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Redirecting…
-              </>
-            ) : snapshot.hasSubscription ? (
-              'Update payment method'
-            ) : (
-              'Add card & start trial'
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={handlePortal}
-            disabled={!snapshot.hasSubscription || Boolean(action)}
-            className="inline-flex flex-1 items-center justify-center rounded-2xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {action === 'portal' ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Loading…
-              </>
-            ) : (
-              'Manage billing'
-            )}
-          </button>
-        </div>
-
-        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 hover:bg-white"
-          >
-            Refresh status
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowDetails((prev) => !prev)}
-            className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 font-semibold text-slate-700 hover:bg-white"
-          >
-            {showDetails ? 'Hide plan details' : 'Show plan details'}
-          </button>
-        </div>
-
-        {showDetails && (
+        {/* Pricing cards for users without a subscription */}
+        {!snapshot.hasSubscription && (
           <div className="mt-2">
-            <SubscriptionManager />
+            <p className="mb-4 text-center text-xs text-slate-500">
+              You won&apos;t be charged until your {TRIAL_PERIOD_DAYS}-day trial ends. Cancel anytime.
+            </p>
+            <PricingCards compact />
           </div>
         )}
 
+        {/* Actions for users who already subscribed */}
+        {snapshot.hasSubscription && (
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={handlePortal}
+              disabled={portalLoading}
+              className="inline-flex flex-1 items-center justify-center rounded-2xl border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {portalLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Loading…
+                </>
+              ) : (
+                'Manage billing'
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-white"
+            >
+              Refresh status
+            </button>
+          </div>
+        )}
+
+        {/* Continue to dashboard */}
         {completed && (
           <div className="flex flex-wrap gap-2">
             <button

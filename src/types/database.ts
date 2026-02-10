@@ -97,147 +97,90 @@ export type Database = {
           },
         ]
       }
-      call_requests: {
-        Row: {
-          id: string
-          call_id: string | null
-          elder_id: string | null
-          type: string | null
-          description: string
-          urgency: string | null
-          quote: string | null
-          resolved: boolean | null
-          resolved_at: string | null
-          created_at: string | null
-        }
-        Insert: {
-          id?: string
-          call_id?: string | null
-          elder_id?: string | null
-          type?: string | null
-          description: string
-          urgency?: string | null
-          quote?: string | null
-          resolved?: boolean | null
-          resolved_at?: string | null
-          created_at?: string | null
-        }
-        Update: {
-          id?: string
-          call_id?: string | null
-          elder_id?: string | null
-          type?: string | null
-          description?: string
-          urgency?: string | null
-          quote?: string | null
-          resolved?: boolean | null
-          resolved_at?: string | null
-          created_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "call_requests_call_id_fkey"
-            columns: ["call_id"]
-            isOneToOne: false
-            referencedRelation: "call_executions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "call_requests_elder_id_fkey"
-            columns: ["elder_id"]
-            isOneToOne: false
-            referencedRelation: "elders"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       call_executions: {
         Row: {
           answered_by: string | null
           attempted_at: string | null
           call_type: string
           completed_at: string | null
+          cost_metadata: Json | null
           created_at: string
+          duration: number | null
           elder_id: string
           ended_by: string | null
+          error_message: string | null
           id: string
-          instructions: string | null
-          meta_data: Json | null
+          inbound_call_back: boolean | null
           onboarding_call: boolean | null
           open_ai_call_id: string | null
           open_ai_session_id: string | null
+          outbound_call_back: boolean | null
           picked_up: boolean | null
+          provider_payload: Json | null
           retry_call: boolean | null
           retry_count: number | null
           schedule_id: string | null
           scheduled_for: string | null
+          snapshot_config: Json | null
           status: string
-          to_number: string | null
-          tools: Json | null
           twilio_call_sid: string | null
-          twilio_child_call_sid: string | null
           updated_at: string
-          vapi_call_id: string | null
-          voice: string | null
-          webhook_url: string | null
         }
         Insert: {
           answered_by?: string | null
           attempted_at?: string | null
           call_type: string
           completed_at?: string | null
+          cost_metadata?: Json | null
           created_at?: string
+          duration?: number | null
           elder_id: string
           ended_by?: string | null
+          error_message?: string | null
           id?: string
-          instructions?: string | null
-          meta_data?: Json | null
+          inbound_call_back?: boolean | null
           onboarding_call?: boolean | null
           open_ai_call_id?: string | null
           open_ai_session_id?: string | null
+          outbound_call_back?: boolean | null
           picked_up?: boolean | null
+          provider_payload?: Json | null
           retry_call?: boolean | null
           retry_count?: number | null
           schedule_id?: string | null
           scheduled_for?: string | null
+          snapshot_config?: Json | null
           status?: string
-          to_number?: string | null
-          tools?: Json | null
           twilio_call_sid?: string | null
-          twilio_child_call_sid?: string | null
           updated_at?: string
-          vapi_call_id?: string | null
-          voice?: string | null
-          webhook_url?: string | null
         }
         Update: {
           answered_by?: string | null
           attempted_at?: string | null
           call_type?: string
           completed_at?: string | null
+          cost_metadata?: Json | null
           created_at?: string
+          duration?: number | null
           elder_id?: string
           ended_by?: string | null
+          error_message?: string | null
           id?: string
-          instructions?: string | null
-          meta_data?: Json | null
+          inbound_call_back?: boolean | null
           onboarding_call?: boolean | null
           open_ai_call_id?: string | null
           open_ai_session_id?: string | null
+          outbound_call_back?: boolean | null
           picked_up?: boolean | null
+          provider_payload?: Json | null
           retry_call?: boolean | null
           retry_count?: number | null
           schedule_id?: string | null
           scheduled_for?: string | null
+          snapshot_config?: Json | null
           status?: string
-          to_number?: string | null
-          tools?: Json | null
           twilio_call_sid?: string | null
-          twilio_child_call_sid?: string | null
           updated_at?: string
-          vapi_call_id?: string | null
-          voice?: string | null
-          webhook_url?: string | null
         }
         Relationships: [
           {
@@ -256,6 +199,60 @@ export type Database = {
           },
         ]
       }
+      call_requests: {
+        Row: {
+          call_id: string | null
+          created_at: string | null
+          description: string
+          elder_id: string | null
+          id: string
+          quote: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          type: string | null
+          urgency: string | null
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string | null
+          description: string
+          elder_id?: string | null
+          id?: string
+          quote?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          type?: string | null
+          urgency?: string | null
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string | null
+          description?: string
+          elder_id?: string | null
+          id?: string
+          quote?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          type?: string | null
+          urgency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_requests_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "post_call_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_requests_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_schedules: {
         Row: {
           active: boolean | null
@@ -267,7 +264,7 @@ export type Database = {
           frequency: string
           id: string
           max_retries: number | null
-          max_retries_action: 'email' | 'escalate' | null
+          max_retries_action: Database["public"]["Enums"]["max_retries_action"]
           name: string | null
           org_id: string | null
           retry_after_minutes: number
@@ -284,6 +281,7 @@ export type Database = {
           frequency: string
           id?: string
           max_retries?: number | null
+          max_retries_action?: Database["public"]["Enums"]["max_retries_action"]
           name?: string | null
           org_id?: string | null
           retry_after_minutes: number
@@ -300,6 +298,7 @@ export type Database = {
           frequency?: string
           id?: string
           max_retries?: number | null
+          max_retries_action?: Database["public"]["Enums"]["max_retries_action"]
           name?: string | null
           org_id?: string | null
           retry_after_minutes?: number
@@ -379,7 +378,7 @@ export type Database = {
           missed_calls?: number | null
           overall_mood?: string | null
           overall_tone?: string | null
-          report_date: string
+          report_date?: string
           successful_calls?: number | null
           summary?: string | null
           total_call_costs?: number | null
@@ -399,6 +398,7 @@ export type Database = {
       demo_calls: {
         Row: {
           analysis: Json | null
+          audio_url: string | null
           created_at: string | null
           duration_seconds: number | null
           email_sent: boolean | null
@@ -415,6 +415,7 @@ export type Database = {
         }
         Insert: {
           analysis?: Json | null
+          audio_url?: string | null
           created_at?: string | null
           duration_seconds?: number | null
           email_sent?: boolean | null
@@ -431,6 +432,7 @@ export type Database = {
         }
         Update: {
           analysis?: Json | null
+          audio_url?: string | null
           created_at?: string | null
           duration_seconds?: number | null
           email_sent?: boolean | null
@@ -648,6 +650,7 @@ export type Database = {
           active: boolean | null
           address: string | null
           created_at: string
+          eva_communication_style: Database["public"]["Enums"]["eva_communication_style_enum"]
           first_name: string
           id: string
           last_name: string
@@ -659,7 +662,6 @@ export type Database = {
           personal_info: string | null
           phone: string
           preferences: Json | null
-          eva_communication_style: 'caring' | 'witty' | 'serious' | null
           updated_at: string
           user_id: string | null
         }
@@ -667,6 +669,7 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           created_at?: string
+          eva_communication_style?: Database["public"]["Enums"]["eva_communication_style_enum"]
           first_name: string
           id?: string
           last_name: string
@@ -678,7 +681,6 @@ export type Database = {
           personal_info?: string | null
           phone: string
           preferences?: Json | null
-          eva_communication_style?: 'caring' | 'witty' | 'serious' | null
           updated_at?: string
           user_id?: string | null
         }
@@ -686,6 +688,7 @@ export type Database = {
           active?: boolean | null
           address?: string | null
           created_at?: string
+          eva_communication_style?: Database["public"]["Enums"]["eva_communication_style_enum"]
           first_name?: string
           id?: string
           last_name?: string
@@ -781,12 +784,13 @@ export type Database = {
           call_duration_seconds: number | null
           call_execution_id: string | null
           contact_method: string
-          contact_response: string | null
+          could_resolve: boolean | null
           created_at: string
           emergency_contact_id: string | null
           escalation_incident_id: string | null
           id: string
           status: string
+          summary: string | null
         }
         Insert: {
           answered_at?: string | null
@@ -794,12 +798,13 @@ export type Database = {
           call_duration_seconds?: number | null
           call_execution_id?: string | null
           contact_method: string
-          contact_response?: string | null
+          could_resolve?: boolean | null
           created_at?: string
           emergency_contact_id?: string | null
           escalation_incident_id?: string | null
           id?: string
           status: string
+          summary?: string | null
         }
         Update: {
           answered_at?: string | null
@@ -807,12 +812,13 @@ export type Database = {
           call_duration_seconds?: number | null
           call_execution_id?: string | null
           contact_method?: string
-          contact_response?: string | null
+          could_resolve?: boolean | null
           created_at?: string
           emergency_contact_id?: string | null
           escalation_incident_id?: string | null
           id?: string
           status?: string
+          summary?: string | null
         }
         Relationships: [
           {
@@ -914,6 +920,7 @@ export type Database = {
           resolution_notes: string | null
           resolved_at: string | null
           severity_level: string
+          skip_followup: boolean
           status: string
           updated_at: string
           vapi_tool_call_data: Json | null
@@ -929,6 +936,7 @@ export type Database = {
           resolution_notes?: string | null
           resolved_at?: string | null
           severity_level: string
+          skip_followup?: boolean
           status?: string
           updated_at?: string
           vapi_tool_call_data?: Json | null
@@ -944,6 +952,7 @@ export type Database = {
           resolution_notes?: string | null
           resolved_at?: string | null
           severity_level?: string
+          skip_followup?: boolean
           status?: string
           updated_at?: string
           vapi_tool_call_data?: Json | null
@@ -1063,7 +1072,7 @@ export type Database = {
           email_normalized?: string | null
           expires_at?: string | null
           id?: string
-          org_id: string
+          org_id?: string
           role?: string
           status?: string
           token?: string
@@ -1126,78 +1135,72 @@ export type Database = {
       post_call_reports: {
         Row: {
           agenda_completion: Json | null
-          call_ended_at: string | null
-          call_started_at: string
-          call_status: string
-          confidence_score: number | null
+          callback_analysis: Json | null
+          checklist_completion: Json | null
+          conversation_quality: Json | null
           created_at: string
-          duration_seconds: number | null
           elder_id: string
           escalation_data: Json | null
           escalation_triggered: boolean | null
           execution_id: string
           health_indicators: Json | null
           id: string
-          mood_assessment: string | null
+          loneliness_indicators: Json | null
+          mental_health: Json | null
+          onboarding_data: Json | null
+          physical_health: Json | null
           recording_storage_path: string | null
           recording_url: string | null
-          sentiment_score: number | null
+          social_environment: Json | null
           summary: string | null
-          tone_analysis: string | null
-          transcript: string | null
-          twilio_cost_usd: number | null
-          vapi_call_id: string | null
-          vapi_cost_pence: number | null
+          transcript: Json | null
+          transcript_raw: string | null
         }
         Insert: {
           agenda_completion?: Json | null
-          call_ended_at?: string | null
-          call_started_at: string
-          call_status: string
-          confidence_score?: number | null
+          callback_analysis?: Json | null
+          checklist_completion?: Json | null
+          conversation_quality?: Json | null
           created_at?: string
-          duration_seconds?: number | null
           elder_id: string
           escalation_data?: Json | null
           escalation_triggered?: boolean | null
           execution_id: string
           health_indicators?: Json | null
           id?: string
-          mood_assessment?: string | null
+          loneliness_indicators?: Json | null
+          mental_health?: Json | null
+          onboarding_data?: Json | null
+          physical_health?: Json | null
           recording_storage_path?: string | null
           recording_url?: string | null
-          sentiment_score?: number | null
+          social_environment?: Json | null
           summary?: string | null
-          tone_analysis?: string | null
-          transcript?: string | null
-          twilio_cost_usd?: number | null
-          vapi_call_id?: string | null
-          vapi_cost_pence?: number | null
+          transcript?: Json | null
+          transcript_raw?: string | null
         }
         Update: {
           agenda_completion?: Json | null
-          call_ended_at?: string | null
-          call_started_at?: string
-          call_status?: string
-          confidence_score?: number | null
+          callback_analysis?: Json | null
+          checklist_completion?: Json | null
+          conversation_quality?: Json | null
           created_at?: string
-          duration_seconds?: number | null
           elder_id?: string
           escalation_data?: Json | null
           escalation_triggered?: boolean | null
           execution_id?: string
           health_indicators?: Json | null
           id?: string
-          mood_assessment?: string | null
+          loneliness_indicators?: Json | null
+          mental_health?: Json | null
+          onboarding_data?: Json | null
+          physical_health?: Json | null
           recording_storage_path?: string | null
           recording_url?: string | null
-          sentiment_score?: number | null
+          social_environment?: Json | null
           summary?: string | null
-          tone_analysis?: string | null
-          transcript?: string | null
-          twilio_cost_usd?: number | null
-          vapi_call_id?: string | null
-          vapi_cost_pence?: number | null
+          transcript?: Json | null
+          transcript_raw?: string | null
         }
         Relationships: [
           {
@@ -1209,41 +1212,6 @@ export type Database = {
           },
           {
             foreignKeyName: "post_call_reports_execution_id_fkey"
-            columns: ["execution_id"]
-            isOneToOne: false
-            referencedRelation: "call_executions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tool_call_usage: {
-        Row: {
-          created_at: string
-          execution_id: string | null
-          id: string
-          input: Json | null
-          output: Json | null
-          type: string | null
-        }
-        Insert: {
-          created_at?: string
-          execution_id?: string | null
-          id?: string
-          input?: Json | null
-          output?: Json | null
-          type?: string | null
-        }
-        Update: {
-          created_at?: string
-          execution_id?: string | null
-          id?: string
-          input?: Json | null
-          output?: Json | null
-          type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tool_call_usage_execution_id_fkey"
             columns: ["execution_id"]
             isOneToOne: false
             referencedRelation: "call_executions"
@@ -1367,8 +1335,12 @@ export type Database = {
         Row: {
           account_type: string
           auth_user_id: string | null
+          call_recording_notified: boolean | null
+          call_recording_notified_timestamp: boolean | null
           created_at: string
           email: string
+          family_consent_given: boolean | null
+          family_consent_given_timestamp: string[] | null
           first_name: string
           health_data_processing_consent: boolean | null
           health_data_processing_consent_timestamp: string | null
@@ -1381,15 +1353,17 @@ export type Database = {
           subscription_current_period_end: string | null
           subscription_plan: string | null
           subscription_status: string | null
-          terms_privacy_consent: boolean | null
-          terms_privacy_consent_timestamp: string | null
           updated_at: string
         }
         Insert: {
           account_type?: string
           auth_user_id?: string | null
+          call_recording_notified?: boolean | null
+          call_recording_notified_timestamp?: boolean | null
           created_at?: string
           email: string
+          family_consent_given?: boolean | null
+          family_consent_given_timestamp?: string[] | null
           first_name: string
           health_data_processing_consent?: boolean | null
           health_data_processing_consent_timestamp?: string | null
@@ -1402,15 +1376,17 @@ export type Database = {
           subscription_current_period_end?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
-          terms_privacy_consent?: boolean | null
-          terms_privacy_consent_timestamp?: string | null
           updated_at?: string
         }
         Update: {
           account_type?: string
           auth_user_id?: string | null
+          call_recording_notified?: boolean | null
+          call_recording_notified_timestamp?: boolean | null
           created_at?: string
           email?: string
+          family_consent_given?: boolean | null
+          family_consent_given_timestamp?: string[] | null
           first_name?: string
           health_data_processing_consent?: boolean | null
           health_data_processing_consent_timestamp?: string | null
@@ -1423,8 +1399,6 @@ export type Database = {
           subscription_current_period_end?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
-          terms_privacy_consent?: boolean | null
-          terms_privacy_consent_timestamp?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1506,7 +1480,8 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      eva_communication_style_enum: "caring" | "witty" | "serious"
+      max_retries_action: "email" | "escalate"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1633,6 +1608,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      eva_communication_style_enum: ["caring", "witty", "serious"],
+      max_retries_action: ["email", "escalate"],
+    },
   },
 } as const
