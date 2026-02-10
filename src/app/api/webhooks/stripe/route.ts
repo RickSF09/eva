@@ -24,7 +24,10 @@ async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const configPlan = getPlanByPriceId(priceId)
   const planSlug = configPlan?.slug ?? primaryItem?.price.nickname ?? priceId
 
-  const currentPeriodEnd = (subscription as any).current_period_end as number | undefined
+  // Stripe API 2026: current_period_end moved from Subscription to SubscriptionItem
+  const currentPeriodEnd =
+    primaryItem?.current_period_end ??
+    (subscription as { current_period_end?: number }).current_period_end
   const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
 
   const { error } = await supabaseAdmin
