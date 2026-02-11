@@ -151,7 +151,6 @@ export default function B2COnboardingPage() {
   const { snapshot, steps, loading, error, isComplete, nextStepId, refresh } = useB2COnboardingSnapshot()
   const [activeStep, setActiveStep] = useState<OnboardingStepId>('elder')
   const [initialized, setInitialized] = useState(false)
-  const [isRedirecting, setIsRedirecting] = useState(false)
 
   console.log('B2COnboardingPage Render:', { 
     loading, 
@@ -165,16 +164,10 @@ export default function B2COnboardingPage() {
 
   useEffect(() => {
     if (!loading && !initialized) {
-      if (isComplete && !billingParam) {
-        setIsRedirecting(true)
-        router.push('/app/home')
-        return
-      }
-
       setActiveStep(nextStepId)
       setInitialized(true)
     }
-  }, [loading, nextStepId, initialized, isComplete, billingParam, router])
+  }, [loading, nextStepId, initialized])
 
   useEffect(() => {
     if (billingParam) {
@@ -185,21 +178,12 @@ export default function B2COnboardingPage() {
   const completedCount = useMemo(() => steps.filter((step) => step.completed).length, [steps])
   const progressPercent = Math.round((completedCount / steps.length) * 100)
 
-  const goToNextIncomplete = () => {
-    const next = steps.find((step) => !step.completed)
-    if (next) {
-      setActiveStep(next.id)
-    }
-  }
-
-  if (loading || isRedirecting) {
+  if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full border-b-2 border-slate-600" />
-          <p className="mt-3 text-sm text-slate-500">
-            {isRedirecting ? 'Redirecting to dashboard…' : 'Loading your onboarding flow…'}
-          </p>
+          <p className="mt-3 text-sm text-slate-500">Loading your onboarding flow…</p>
         </div>
       </div>
     )
@@ -230,7 +214,7 @@ export default function B2COnboardingPage() {
           {isComplete && (
             <CompletionBanner
               onPrimary={() => router.push('/app/home')}
-              onSecondary={() => router.push('/app/elder')}
+              onSecondary={() => setActiveStep('elder')}
             />
           )}
 
@@ -239,7 +223,7 @@ export default function B2COnboardingPage() {
               snapshot={snapshot}
               completed={stepMap.elder?.completed ?? false}
               onSaved={refresh}
-              onContinue={goToNextIncomplete}
+              onContinue={() => setActiveStep('schedule')}
             />
           )}
 
@@ -248,7 +232,7 @@ export default function B2COnboardingPage() {
               snapshot={snapshot}
               completed={stepMap.schedule?.completed ?? false}
               onSaved={refresh}
-              onContinue={goToNextIncomplete}
+              onContinue={() => setActiveStep('contact')}
             />
           )}
 
@@ -257,7 +241,7 @@ export default function B2COnboardingPage() {
               snapshot={snapshot}
               completed={stepMap.contact?.completed ?? false}
               onSaved={refresh}
-              onContinue={goToNextIncomplete}
+              onContinue={() => setActiveStep('billing')}
             />
           )}
 
@@ -531,7 +515,8 @@ function ElderStep({
       }
 
       setFeedback({ type: 'success', message: 'Saved. Eva can now address your loved one by name.' })
-      onSaved()
+      await Promise.resolve(onSaved())
+      onContinue()
     } catch (err) {
       console.error('Failed to save elder details', err)
       setFeedback({ type: 'error', message: 'Could not save those details. Please try again.' })
@@ -910,7 +895,8 @@ function ScheduleStep({
       }
 
       setMessage({ type: 'success', text: 'Schedule saved. Eva knows when to dial.' })
-      onSaved()
+      await Promise.resolve(onSaved())
+      onContinue()
     } catch (err) {
       console.error('Failed to save schedule', err)
       setMessage({ type: 'error', text: 'Unable to save that plan. Please try again.' })
@@ -1337,7 +1323,8 @@ function ContactStep({
       }
 
       setMessage({ type: 'success', text: 'Contact saved. Escalations now have a backup.' })
-      onSaved()
+      await Promise.resolve(onSaved())
+      onContinue()
     } catch (err) {
       console.error('Failed to save contact', err)
       setMessage({ type: 'error', text: 'Could not save that contact. Please try again.' })

@@ -18,9 +18,13 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
   const {
     loading: onboardingLoading,
     isComplete: onboardingComplete,
+    error: onboardingError,
+    refresh: refreshOnboardingSnapshot,
   } = useB2COnboardingSnapshot({ enabled: Boolean(user) })
   const [redirecting, setRedirecting] = useState(false)
   const [mfaChecking, setMfaChecking] = useState(false)
+  const [recheckingOnboarding, setRecheckingOnboarding] = useState(false)
+  const [hasRecheckedForPath, setHasRecheckedForPath] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -63,22 +67,69 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
   }, [user, loading, onboardingLoading, router])
 
   useEffect(() => {
+    setHasRecheckedForPath(false)
+  }, [pathname])
+
+  useEffect(() => {
+    let active = true
+
     if (!user) {
       setRedirecting(false)
-      return
+      return () => {
+        active = false
+      }
+    }
+
+    if (onboardingLoading || onboardingError || recheckingOnboarding) {
+      setRedirecting(false)
+      return () => {
+        active = false
+      }
     }
 
     const onOnboardingPage = pathname?.startsWith('/app/onboarding')
-
-    if (!onboardingLoading && !onboardingComplete && !onOnboardingPage) {
-      setRedirecting(true)
-      router.replace('/app/onboarding')
-    } else {
+    if (onOnboardingPage || onboardingComplete) {
       setRedirecting(false)
+      return () => {
+        active = false
+      }
     }
-  }, [user, pathname, onboardingLoading, onboardingComplete, router])
 
-  if (loading || mfaChecking || (user && onboardingLoading)) {
+    if (!hasRecheckedForPath) {
+      setHasRecheckedForPath(true)
+      setRedirecting(false)
+      setRecheckingOnboarding(true)
+
+      void refreshOnboardingSnapshot().finally(() => {
+        if (active) {
+          setRecheckingOnboarding(false)
+        }
+      })
+
+      return () => {
+        active = false
+      }
+    }
+
+    setRedirecting(true)
+    router.replace('/app/onboarding')
+
+    return () => {
+      active = false
+    }
+  }, [
+    user,
+    pathname,
+    onboardingLoading,
+    onboardingError,
+    recheckingOnboarding,
+    onboardingComplete,
+    hasRecheckedForPath,
+    refreshOnboardingSnapshot,
+    router,
+  ])
+
+  if (loading || mfaChecking || (user && (onboardingLoading || recheckingOnboarding))) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
