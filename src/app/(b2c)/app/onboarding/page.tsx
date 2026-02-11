@@ -992,11 +992,16 @@ function ScheduleStep({
           <p className="text-sm font-medium text-slate-700">Times</p>
           <div className="mt-2 space-y-3">
             {form.times.map((time, index) => (
-              <div key={`${time}-${index}`} className="flex items-center gap-2">
+              <div key={index} className="flex items-center gap-2">
                 <input
                   type="time"
                   value={time}
                   onChange={(event) => updateTime(index, event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                    }
+                  }}
                   className="w-40 rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100"
                   required
                 />
@@ -1690,4 +1695,3 @@ function formatSubscriptionStatus(status: string | null) {
       return 'Not active yet'
   }
 }
-
