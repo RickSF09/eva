@@ -3,7 +3,7 @@
 import { B2CSidebar } from './B2CSidebar'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useB2COnboardingSnapshot } from '@/hooks/useB2COnboarding'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -25,6 +25,13 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
   const [mfaChecking, setMfaChecking] = useState(false)
   const [recheckingOnboarding, setRecheckingOnboarding] = useState(false)
   const [hasRecheckedForPath, setHasRecheckedForPath] = useState(false)
+  const isMountedRef = useRef(true)
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -71,28 +78,20 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
   }, [pathname])
 
   useEffect(() => {
-    let active = true
-
     if (!user) {
       setRedirecting(false)
-      return () => {
-        active = false
-      }
+      return
     }
 
     if (onboardingLoading || onboardingError || recheckingOnboarding) {
       setRedirecting(false)
-      return () => {
-        active = false
-      }
+      return
     }
 
     const onOnboardingPage = pathname?.startsWith('/app/onboarding')
     if (onOnboardingPage || onboardingComplete) {
       setRedirecting(false)
-      return () => {
-        active = false
-      }
+      return
     }
 
     if (!hasRecheckedForPath) {
@@ -101,22 +100,16 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
       setRecheckingOnboarding(true)
 
       void refreshOnboardingSnapshot().finally(() => {
-        if (active) {
+        if (isMountedRef.current) {
           setRecheckingOnboarding(false)
         }
       })
 
-      return () => {
-        active = false
-      }
+      return
     }
 
     setRedirecting(true)
     router.replace('/app/onboarding')
-
-    return () => {
-      active = false
-    }
   }, [
     user,
     pathname,
