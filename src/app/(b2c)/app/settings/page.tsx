@@ -270,14 +270,31 @@ export default function B2CSettingsPage() {
       const baseUrl =
         process.env.NEXT_PUBLIC_APP_URL ||
         (typeof window !== 'undefined' ? window.location.origin : null)
-      const redirectTo = baseUrl ? `${baseUrl}/login` : undefined
+      const redirectTo = baseUrl ? `${baseUrl}/reset-password` : undefined
 
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        user.email,
-        redirectTo ? { redirectTo } : undefined
-      )
+      const response = await fetch('/api/auth/request-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user.email, redirectTo }),
+      })
 
-      if (error) throw error
+      const data = await response.json().catch(() => ({} as { error?: string; code?: string }))
+
+      if (!response.ok) {
+        const isRateLimited =
+          response.status === 429 ||
+          data.code === 'over_email_send_rate_limit'
+
+        if (isRateLimited) {
+          setResetPasswordStatus({
+            type: 'error',
+            message: 'Too many reset attempts. Please wait 60 seconds and try again.',
+          })
+          return
+        }
+
+        throw new Error(data.error || 'Failed to request password reset')
+      }
 
       setResetPasswordStatus({
         type: 'success',
@@ -285,19 +302,9 @@ export default function B2CSettingsPage() {
       })
     } catch (error) {
       console.error('Failed to send password reset email', error)
-      const isRateLimited =
-        typeof error === 'object' &&
-        error !== null &&
-        (
-          ('status' in error && (error as { status?: number }).status === 429) ||
-          ('code' in error && (error as { code?: string }).code === 'over_email_send_rate_limit')
-        )
-
       setResetPasswordStatus({
         type: 'error',
-        message: isRateLimited
-          ? 'Too many reset attempts. Please wait 60 seconds and try again.'
-          : 'Unable to send reset email. Please try again.',
+        message: 'Unable to send reset email. Please try again.',
       })
     } finally {
       setResettingPassword(false)
