@@ -17,7 +17,12 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error('Error sending reset email:', error)
-      return NextResponse.json({ error: error.message }, { status: 400 })
+      const errorWithMeta = error as { status?: number; code?: string }
+      const status = typeof errorWithMeta.status === 'number' ? errorWithMeta.status : 400
+      return NextResponse.json(
+        { error: error.message, code: errorWithMeta.code },
+        { status }
+      )
     }
 
     return NextResponse.json({ success: true })

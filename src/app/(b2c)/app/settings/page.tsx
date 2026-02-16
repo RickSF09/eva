@@ -281,13 +281,23 @@ export default function B2CSettingsPage() {
 
       setResetPasswordStatus({
         type: 'success',
-        message: 'We emailed you a password reset link.',
+        message: 'We emailed you a password reset link. Check your junk/spam folder if you do not see it.',
       })
     } catch (error) {
       console.error('Failed to send password reset email', error)
+      const isRateLimited =
+        typeof error === 'object' &&
+        error !== null &&
+        (
+          ('status' in error && (error as { status?: number }).status === 429) ||
+          ('code' in error && (error as { code?: string }).code === 'over_email_send_rate_limit')
+        )
+
       setResetPasswordStatus({
         type: 'error',
-        message: 'Unable to send reset email. Please try again.',
+        message: isRateLimited
+          ? 'Too many reset attempts. Please wait 60 seconds and try again.'
+          : 'Unable to send reset email. Please try again.',
       })
     } finally {
       setResettingPassword(false)

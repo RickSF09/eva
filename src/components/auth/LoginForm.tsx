@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 interface LoginFormProps {
   onToggleMode: () => void
 }
+
+const RESET_COOLDOWN_SECONDS = 60
 
 export function LoginForm({ onToggleMode }: LoginFormProps) {
   const [email, setEmail] = useState('')
@@ -15,7 +17,18 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [resettingPassword, setResettingPassword] = useState(false)
+  const [resetCooldownSeconds, setResetCooldownSeconds] = useState(0)
   const [resetStatus, setResetStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  useEffect(() => {
+    if (resetCooldownSeconds <= 0) return
+
+    const timerId = window.setInterval(() => {
+      setResetCooldownSeconds((seconds) => (seconds <= 1 ? 0 : seconds - 1))
+    }, 1000)
+
+    return () => window.clearInterval(timerId)
+  }, [resetCooldownSeconds])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,7 +45,7 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
       if (error) {
         setError(error.message)
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -46,6 +59,10 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
         type: 'error',
         message: 'Enter your email above to receive a reset link.',
       })
+      return
+    }
+
+    if (resetCooldownSeconds > 0) {
       return
     }
 
@@ -70,14 +87,28 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
         body: JSON.stringify({ email: trimmedEmail, redirectTo }),
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => ({} as { error?: string; code?: string }))
       if (!response.ok) {
+        const isRateLimited =
+          response.status === 429 ||
+          data.code === 'over_email_send_rate_limit'
+
+        if (isRateLimited) {
+          setResetCooldownSeconds(RESET_COOLDOWN_SECONDS)
+          setResetStatus({
+            type: 'error',
+            message: 'Too many reset attempts. Please wait 60 seconds and try again.',
+          })
+          return
+        }
+
         throw new Error(data.error || 'Failed to request password reset')
       }
 
+      setResetCooldownSeconds(RESET_COOLDOWN_SECONDS)
       setResetStatus({
         type: 'success',
-        message: 'We emailed you a password reset link.',
+        message: 'We emailed you a password reset link. Check your junk/spam folder if you do not see it.',
       })
     } catch (err) {
       console.error('Failed to send password reset email', err)
@@ -151,10 +182,14 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
             <button
               type="button"
               onClick={handleForgotPassword}
-              disabled={resettingPassword}
+              disabled={resettingPassword || resetCooldownSeconds > 0}
               className="text-blue-600 hover:text-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {resettingPassword ? 'Sending link…' : 'Forgot password?'}
+              {resettingPassword
+                ? 'Sending link…'
+                : resetCooldownSeconds > 0
+                  ? `Try again in ${resetCooldownSeconds}s`
+                  : 'Forgot password?'}
             </button>
           </div>
 
