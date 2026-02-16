@@ -11,6 +11,20 @@ import { supabase } from '@/lib/supabase'
 
 type AccountType = 'b2b' | 'b2c'
 
+function isRecoveryFlow(searchParams: ReturnType<typeof useSearchParams>) {
+  if (searchParams.get('type') === 'recovery') return true
+
+  if (typeof window !== 'undefined') {
+    const hash = window.location.hash.startsWith('#') ? window.location.hash.substring(1) : ''
+    if (hash) {
+      const hashParams = new URLSearchParams(hash)
+      return hashParams.get('type') === 'recovery'
+    }
+  }
+
+  return false
+}
+
 function HomeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -22,14 +36,7 @@ function HomeContent() {
 
   // Check for password reset flow before any other logic
   useEffect(() => {
-    // If we have a recovery code/token, user should be on reset-password page
-    // This handles cases where Supabase redirects to home but preserves query params
-    const type = searchParams.get('type')
-    const code = searchParams.get('code')
-    const tokenHash = searchParams.get('token_hash') // for implicit flow
-    
-    // Check if we just came from a reset flow (sometimes hash is used)
-    const isRecovery = type === 'recovery' || !!code || !!tokenHash
+    const isRecovery = isRecoveryFlow(searchParams)
 
     if (isRecovery) {
        // Preserve query parameters so the reset page can handle the exchange
@@ -39,11 +46,7 @@ function HomeContent() {
   }, [searchParams, router])
 
   useEffect(() => {
-    // Let's refine the logic to prevent race conditions.
-    const type = searchParams.get('type')
-    const code = searchParams.get('code')
-    const tokenHash = searchParams.get('token_hash')
-    const isRecovery = type === 'recovery' || !!code || !!tokenHash
+    const isRecovery = isRecoveryFlow(searchParams)
     
     if (isRecovery) return
 
@@ -85,10 +88,7 @@ function HomeContent() {
   }, [user, searchParams])
 
   useEffect(() => {
-    const type = searchParams.get('type')
-    const code = searchParams.get('code')
-    const tokenHash = searchParams.get('token_hash')
-    const isRecovery = type === 'recovery' || !!code || !!tokenHash
+    const isRecovery = isRecoveryFlow(searchParams)
     
     if (isRecovery) return
 
@@ -117,8 +117,7 @@ function HomeContent() {
   }, [user, accountType, authLoading, profileLoading, orgLoading, organizations.length])
 
   // If handling recovery flow, show spinner while redirecting
-  const type = searchParams.get('type')
-  const isRecovery = type === 'recovery' || !!searchParams.get('code') || !!searchParams.get('token_hash')
+  const isRecovery = isRecoveryFlow(searchParams)
   
   if (isRecovery) {
      return (

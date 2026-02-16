@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, Suspense, useEffect, useState } from 'react'
+import { FormEvent, Suspense, useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { LoginForm } from '@/components/auth/LoginForm'
@@ -131,26 +131,23 @@ function LoginPageContent() {
   const [mfaSetupError, setMfaSetupError] = useState('')
 
   // Check if this is a password recovery flow
-  const isRecoveryFlow = () => {
-    // Check query params
-    const type = searchParams.get('type')
-    const code = searchParams.get('code')
-    const tokenHash = searchParams.get('token_hash')
-    
-    if (type === 'recovery' || code || tokenHash) {
+  const isRecoveryFlow = useCallback(() => {
+    // Only recovery links should reach reset-password. Signup/magic links can also carry code/token params.
+    if (searchParams.get('type') === 'recovery') {
       return true
     }
     
-    // Also check URL hash (Supabase sometimes uses hash fragments)
+    // Also check URL hash (Supabase sometimes uses hash fragments).
     if (typeof window !== 'undefined') {
-      const hash = window.location.hash
-      if (hash.includes('type=recovery') || hash.includes('access_token')) {
+      const hash = window.location.hash.startsWith('#') ? window.location.hash.substring(1) : ''
+      const hashParams = new URLSearchParams(hash)
+      if (hashParams.get('type') === 'recovery') {
         return true
       }
     }
     
     return false
-  }
+  }, [searchParams])
 
   useEffect(() => {
     const checkAal = async () => {
@@ -195,7 +192,7 @@ function LoginPageContent() {
     }
 
     void checkAal()
-  }, [user, loading, router, searchParams])
+  }, [user, loading, router, searchParams, isRecoveryFlow])
 
   // If recovery flow detected, show loading while redirecting
   if (user && isRecoveryFlow()) {
