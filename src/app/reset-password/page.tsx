@@ -8,6 +8,23 @@ import { useAuth } from '@/components/auth/AuthProvider'
 
 type Status = { type: 'success' | 'error'; message: string } | null
 
+function getPasswordUpdateErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const rawMessage = (error as { message?: unknown }).message
+    if (typeof rawMessage === 'string' && rawMessage.trim()) {
+      const normalized = rawMessage.toLowerCase()
+
+      if (normalized.includes('different from the old password')) {
+        return 'Your new password must be different from your current password.'
+      }
+
+      return rawMessage.trim()
+    }
+  }
+
+  return 'Unable to update password. Please request a new reset link.'
+}
+
 export default function ResetPasswordPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
@@ -50,7 +67,7 @@ export default function ResetPasswordPage() {
       console.error('Failed to update password', err)
       setStatus({
         type: 'error',
-        message: 'Unable to update password. Please request a new reset link.',
+        message: getPasswordUpdateErrorMessage(err),
       })
     } finally {
       setSaving(false)
