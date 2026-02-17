@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Building2, Users, Plus } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
@@ -11,6 +12,7 @@ interface OrganizationSetupProps {
 }
 
 export function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
+  const router = useRouter()
   const { user } = useAuth()
   const { refetch: fetchOrganizations } = useOrganizations()
   
@@ -18,7 +20,23 @@ export function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
   const [orgName, setOrgName] = useState('')
   const [joinCode, setJoinCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [exiting, setExiting] = useState(false)
   const [error, setError] = useState('')
+
+  const handleExitSetup = async () => {
+    setExiting(true)
+    setError('')
+
+    try {
+      await supabase.auth.signOut()
+      router.replace('/')
+    } catch (error) {
+      console.error('Error exiting setup:', error)
+      setError(error instanceof Error ? error.message : 'Failed to exit setup')
+    } finally {
+      setExiting(false)
+    }
+  }
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -241,10 +259,19 @@ export function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || exiting}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Creating...' : 'Create organization'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExitSetup}
+                disabled={loading || exiting}
+                className="w-full border border-gray-200 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-50 focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {exiting ? 'Exiting...' : 'Exit setup'}
               </button>
             </form>
           ) : (
@@ -275,10 +302,19 @@ export function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || exiting}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? 'Joining...' : 'Join organization'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExitSetup}
+                disabled={loading || exiting}
+                className="w-full border border-gray-200 text-gray-700 py-3 px-4 rounded-xl font-medium hover:bg-gray-50 focus:ring-2 focus:ring-gray-300 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {exiting ? 'Exiting...' : 'Exit setup'}
               </button>
             </form>
           )}
@@ -287,4 +323,3 @@ export function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
     </div>
   )
 }
-
