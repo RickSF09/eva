@@ -97,6 +97,69 @@ export type Database = {
           },
         ]
       }
+      billing_trial_reminders: {
+        Row: {
+          attempt_count: number
+          created_at: string
+          id: string
+          last_error: string | null
+          reminder_type: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string
+          trial_end_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          reminder_type: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id: string
+          trial_end_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempt_count?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          reminder_type?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string
+          trial_end_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_trial_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_current_context"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "billing_trial_reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_executions: {
         Row: {
           answered_by: string | null
@@ -105,6 +168,7 @@ export type Database = {
           completed_at: string | null
           cost_metadata: Json | null
           created_at: string
+          direction: Database["public"]["Enums"]["call_direction"] | null
           duration: number | null
           elder_id: string
           ended_by: string | null
@@ -133,6 +197,7 @@ export type Database = {
           completed_at?: string | null
           cost_metadata?: Json | null
           created_at?: string
+          direction?: Database["public"]["Enums"]["call_direction"] | null
           duration?: number | null
           elder_id: string
           ended_by?: string | null
@@ -161,6 +226,7 @@ export type Database = {
           completed_at?: string | null
           cost_metadata?: Json | null
           created_at?: string
+          direction?: Database["public"]["Enums"]["call_direction"] | null
           duration?: number | null
           elder_id?: string
           ended_by?: string | null
@@ -311,86 +377,6 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      daily_reports: {
-        Row: {
-          average_call_duration: number | null
-          average_sentiment_score: number | null
-          call_summary_stats: Json | null
-          created_at: string
-          device_events_count: number | null
-          elder_id: string
-          email_sent: boolean | null
-          email_sent_at: string | null
-          escalations: number | null
-          failed_calls: number | null
-          health_metrics: Json | null
-          id: string
-          missed_calls: number | null
-          overall_mood: string | null
-          overall_tone: string | null
-          report_date: string
-          successful_calls: number | null
-          summary: string | null
-          total_call_costs: number | null
-          total_calls_attempted: number | null
-          total_calls_scheduled: number | null
-        }
-        Insert: {
-          average_call_duration?: number | null
-          average_sentiment_score?: number | null
-          call_summary_stats?: Json | null
-          created_at?: string
-          device_events_count?: number | null
-          elder_id: string
-          email_sent?: boolean | null
-          email_sent_at?: string | null
-          escalations?: number | null
-          failed_calls?: number | null
-          health_metrics?: Json | null
-          id?: string
-          missed_calls?: number | null
-          overall_mood?: string | null
-          overall_tone?: string | null
-          report_date: string
-          successful_calls?: number | null
-          summary?: string | null
-          total_call_costs?: number | null
-          total_calls_attempted?: number | null
-          total_calls_scheduled?: number | null
-        }
-        Update: {
-          average_call_duration?: number | null
-          average_sentiment_score?: number | null
-          call_summary_stats?: Json | null
-          created_at?: string
-          device_events_count?: number | null
-          elder_id?: string
-          email_sent?: boolean | null
-          email_sent_at?: string | null
-          escalations?: number | null
-          failed_calls?: number | null
-          health_metrics?: Json | null
-          id?: string
-          missed_calls?: number | null
-          overall_mood?: string | null
-          overall_tone?: string | null
-          report_date?: string
-          successful_calls?: number | null
-          summary?: string | null
-          total_call_costs?: number | null
-          total_calls_attempted?: number | null
-          total_calls_scheduled?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "daily_reports_elder_id_fkey"
-            columns: ["elder_id"]
-            isOneToOne: false
-            referencedRelation: "elders"
             referencedColumns: ["id"]
           },
         ]
@@ -645,10 +631,83 @@ export type Database = {
           },
         ]
       }
+      elder_prompt_context_cache: {
+        Row: {
+          created_at: string
+          elder_id: string
+          error_message: string | null
+          generated_at: string
+          generation_status: string
+          last_call_at: string | null
+          last_call_execution_id: string | null
+          last_call_summary: string | null
+          last_post_call_report_id: string | null
+          older_call_info: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          elder_id: string
+          error_message?: string | null
+          generated_at?: string
+          generation_status?: string
+          last_call_at?: string | null
+          last_call_execution_id?: string | null
+          last_call_summary?: string | null
+          last_post_call_report_id?: string | null
+          older_call_info?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          elder_id?: string
+          error_message?: string | null
+          generated_at?: string
+          generation_status?: string
+          last_call_at?: string | null
+          last_call_execution_id?: string | null
+          last_call_summary?: string | null
+          last_post_call_report_id?: string | null
+          older_call_info?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elder_prompt_context_cache_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: true
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "elder_prompt_context_cache_last_call_execution_id_fkey"
+            columns: ["last_call_execution_id"]
+            isOneToOne: false
+            referencedRelation: "call_executions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "elder_prompt_context_cache_last_post_call_report_id_fkey"
+            columns: ["last_post_call_report_id"]
+            isOneToOne: false
+            referencedRelation: "post_call_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       elders: {
         Row: {
           active: boolean | null
           address: string | null
+          consent_decision_at: string | null
+          consent_method: string | null
+          consent_notes: string | null
+          consent_obtained_at: string | null
+          consent_pathway: string
+          consent_recorded_by: string | null
+          consent_recording_external_url: string | null
+          consent_recording_storage_path: string | null
+          consent_status: string
           created_at: string
           eva_communication_style: Database["public"]["Enums"]["eva_communication_style_enum"]
           first_name: string
@@ -662,12 +721,23 @@ export type Database = {
           personal_info: string | null
           phone: string
           preferences: Json | null
+          self_consent_capable_confirmed: boolean
+          self_consent_capable_confirmed_at: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
           active?: boolean | null
           address?: string | null
+          consent_decision_at?: string | null
+          consent_method?: string | null
+          consent_notes?: string | null
+          consent_obtained_at?: string | null
+          consent_pathway?: string
+          consent_recorded_by?: string | null
+          consent_recording_external_url?: string | null
+          consent_recording_storage_path?: string | null
+          consent_status?: string
           created_at?: string
           eva_communication_style?: Database["public"]["Enums"]["eva_communication_style_enum"]
           first_name: string
@@ -681,12 +751,23 @@ export type Database = {
           personal_info?: string | null
           phone: string
           preferences?: Json | null
+          self_consent_capable_confirmed?: boolean
+          self_consent_capable_confirmed_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           active?: boolean | null
           address?: string | null
+          consent_decision_at?: string | null
+          consent_method?: string | null
+          consent_notes?: string | null
+          consent_obtained_at?: string | null
+          consent_pathway?: string
+          consent_recorded_by?: string | null
+          consent_recording_external_url?: string | null
+          consent_recording_storage_path?: string | null
+          consent_status?: string
           created_at?: string
           eva_communication_style?: Database["public"]["Enums"]["eva_communication_style_enum"]
           first_name?: string
@@ -700,6 +781,8 @@ export type Database = {
           personal_info?: string | null
           phone?: string
           preferences?: Json | null
+          self_consent_capable_confirmed?: boolean
+          self_consent_capable_confirmed_at?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1336,11 +1419,11 @@ export type Database = {
           account_type: string
           auth_user_id: string | null
           call_recording_notified: boolean | null
-          call_recording_notified_timestamp: boolean | null
+          call_recording_notified_timestamp: string | null
           created_at: string
           email: string
           family_consent_given: boolean | null
-          family_consent_given_timestamp: string[] | null
+          family_consent_given_timestamp: string | null
           first_name: string
           health_data_processing_consent: boolean | null
           health_data_processing_consent_timestamp: string | null
@@ -1351,6 +1434,7 @@ export type Database = {
           stripe_subscription_id: string | null
           subscription_cancel_at_period_end: boolean | null
           subscription_current_period_end: string | null
+          subscription_current_period_start: string | null
           subscription_plan: string | null
           subscription_status: string | null
           updated_at: string
@@ -1359,11 +1443,11 @@ export type Database = {
           account_type?: string
           auth_user_id?: string | null
           call_recording_notified?: boolean | null
-          call_recording_notified_timestamp?: boolean | null
+          call_recording_notified_timestamp?: string | null
           created_at?: string
           email: string
           family_consent_given?: boolean | null
-          family_consent_given_timestamp?: string[] | null
+          family_consent_given_timestamp?: string | null
           first_name: string
           health_data_processing_consent?: boolean | null
           health_data_processing_consent_timestamp?: string | null
@@ -1374,6 +1458,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           subscription_cancel_at_period_end?: boolean | null
           subscription_current_period_end?: string | null
+          subscription_current_period_start?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
           updated_at?: string
@@ -1382,11 +1467,11 @@ export type Database = {
           account_type?: string
           auth_user_id?: string | null
           call_recording_notified?: boolean | null
-          call_recording_notified_timestamp?: boolean | null
+          call_recording_notified_timestamp?: string | null
           created_at?: string
           email?: string
           family_consent_given?: boolean | null
-          family_consent_given_timestamp?: string[] | null
+          family_consent_given_timestamp?: string | null
           first_name?: string
           health_data_processing_consent?: boolean | null
           health_data_processing_consent_timestamp?: string | null
@@ -1397,6 +1482,7 @@ export type Database = {
           stripe_subscription_id?: string | null
           subscription_cancel_at_period_end?: boolean | null
           subscription_current_period_end?: string | null
+          subscription_current_period_start?: string | null
           subscription_plan?: string | null
           subscription_status?: string | null
           updated_at?: string
@@ -1433,6 +1519,7 @@ export type Database = {
         Args: { p_auth_user_id: string; p_org_id: string; p_role?: string }
         Returns: string
       }
+      anonymize_old_call_executions: { Args: never; Returns: undefined }
       assign_schedule_to_elder: {
         Args: {
           p_custom_overrides?: Json
@@ -1462,6 +1549,20 @@ export type Database = {
         }
         Returns: string
       }
+      delete_expired_invitations: { Args: never; Returns: undefined }
+      delete_old_call_recordings: { Args: never; Returns: undefined }
+      delete_old_call_transcripts: { Args: never; Returns: undefined }
+      delete_old_demo_calls: { Args: never; Returns: undefined }
+      delete_old_post_call_reports: { Args: never; Returns: undefined }
+      dispatch_due_trial_reminders: {
+        Args: {
+          p_authorization: string
+          p_limit?: number
+          p_url: string
+          p_window?: unknown
+        }
+        Returns: number
+      }
       dispatch_scheduled_calls: { Args: never; Returns: number }
       get_user_organizations: {
         Args: { p_auth_user_id?: string }
@@ -1469,6 +1570,18 @@ export type Database = {
           org_id: string
           role: string
         }[]
+      }
+      next_scheduled_time_from_json_schedule: {
+        Args: { p_call_times: Json; p_days_of_week: Json; p_from_ts?: string }
+        Returns: string
+      }
+      requeue_stale_trial_reminders: {
+        Args: { p_stale?: unknown }
+        Returns: number
+      }
+      run_trial_reminder_tick: {
+        Args: { p_authorization: string; p_url: string }
+        Returns: Json
       }
       schedule_next_call: {
         Args: {
@@ -1478,8 +1591,49 @@ export type Database = {
         }
         Returns: string
       }
+      seed_pending_scheduled_calls_for_elder: {
+        Args: { p_elder_id: string; p_from_ts?: string }
+        Returns: number
+      }
+      sync_trial_reminder_queue_from_users: {
+        Args: { p_now?: string }
+        Returns: Json
+      }
+      upsert_elder_prompt_context_cache: {
+        Args: {
+          p_elder_id: string
+          p_error_message?: string
+          p_generated_at?: string
+          p_generation_status?: string
+          p_last_call_at: string
+          p_last_call_execution_id: string
+          p_last_call_summary: string
+          p_last_post_call_report_id: string
+          p_older_call_info: string
+        }
+        Returns: {
+          created_at: string
+          elder_id: string
+          error_message: string | null
+          generated_at: string
+          generation_status: string
+          last_call_at: string | null
+          last_call_execution_id: string | null
+          last_call_summary: string | null
+          last_post_call_report_id: string | null
+          older_call_info: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "elder_prompt_context_cache"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
     }
     Enums: {
+      call_direction: "outbound" | "inbound"
       eva_communication_style_enum: "caring" | "witty" | "serious"
       max_retries_action: "email" | "escalate"
     }
@@ -1609,6 +1763,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      call_direction: ["outbound", "inbound"],
       eva_communication_style_enum: ["caring", "witty", "serious"],
       max_retries_action: ["email", "escalate"],
     },

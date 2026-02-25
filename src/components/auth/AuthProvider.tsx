@@ -19,11 +19,29 @@ const AuthContext = createContext<AuthContextType>({
 // Module-level promise to dedup token exchange
 let authExchangePromise: Promise<void> | null = null
 
+const AUTH_INIT_TIMEOUT_MS = 8000
+
+async function withTimeout<T>(promise: PromiseLike<T>, label: string, ms = AUTH_INIT_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    }),
+  ])
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let active = true
+    const hardFallbackTimer = setTimeout(() => {
+      if (!active) return
+      console.warn('AuthProvider init fallback fired; releasing loading state to avoid infinite spinner')
+      setLoading(false)
+    }, AUTH_INIT_TIMEOUT_MS + 2000)
+
     const init = async () => {
       try {
         // If redirected from a magic link, set session from hash or exchange code
@@ -45,20 +63,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                   // New password-reset PKCE flow: verify token_hash to create a session
                   if (tokenHash && type === 'recovery') {
-                    const { data, error } = await supabase.auth.verifyOtp({
-                      token_hash: tokenHash,
-                      type: 'recovery',
-                    })
+                    const { data, error } = await withTimeout(
+                      supabase.auth.verifyOtp({
+                        token_hash: tokenHash,
+                        type: 'recovery',
+                      }),
+                      'Supabase verifyOtp(recovery)',
+                    )
                     if (error) {
                       console.error('Failed to verify recovery token', error)
                     } else if (data?.session) {
                       window.history.replaceState({}, document.title, url.origin + url.pathname)
                     }
                   } else if (access_token && refresh_token) {
-                    await supabase.auth.setSession({ access_token, refresh_token })
+                    await withTimeout(
+                      supabase.auth.setSession({ access_token, refresh_token }),
+                      'Supabase setSession',
+                    )
                     window.history.replaceState({}, document.title, url.origin + url.pathname)
                   } else if (hasCode) {
-                    const { error } = await supabase.auth.exchangeCodeForSession(window.location.href)
+                    const { error } = await withTimeout(
+                      supabase.auth.exchangeCodeForSession(window.location.href),
+                      'Supabase exchangeCodeForSession',
+                    )
                     if (error) {
                       console.error('Failed to exchange code for session', error)
                     } else {
@@ -84,22 +111,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Get initial session
-        const { data: { session } } = await supabase.auth.getSession()
-        setUser(session?.user ?? null)
+        const {
+          data: { session },
+        } = await withTimeout(supabase.auth.getSession(), 'Supabase getSession')
+        if (active) {
+          setUser(session?.user ?? null)
+        }
+      } catch (error) {
+        console.error('AuthProvider init failed', error)
       } finally {
-        setLoading(false)
+        if (active) {
+          setLoading(false)
+        }
       }
     }
 
-    init()
+    void init()
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return
       setUser(session?.user ?? null)
       setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      active = false
+      clearTimeout(hardFallbackTimer)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signOut = async () => {

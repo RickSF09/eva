@@ -11,6 +11,15 @@ interface B2CDashboardLayoutProps {
   children: React.ReactNode
 }
 
+function timeoutAfter(ms: number, label: string) {
+  return new Promise<never>((_, reject) => {
+    const timer = setTimeout(() => {
+      clearTimeout(timer)
+      reject(new Error(`${label} timed out after ${ms}ms`))
+    }, ms)
+  })
+}
+
 export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
   const { user, loading } = useAuth()
   const router = useRouter()
@@ -22,7 +31,7 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
     refresh: refreshOnboardingSnapshot,
   } = useB2COnboardingSnapshot({ enabled: Boolean(user) })
   const [redirecting, setRedirecting] = useState(false)
-  const [mfaChecking, setMfaChecking] = useState(false)
+  const [, setMfaChecking] = useState(false)
   const [recheckingOnboarding, setRecheckingOnboarding] = useState(false)
   const [hasRecheckedForPath, setHasRecheckedForPath] = useState(false)
   const isMountedRef = useRef(true)
@@ -48,7 +57,10 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
     const checkAal = async () => {
       setMfaChecking(true)
       try {
-        const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+        const { data, error } = await Promise.race([
+          supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+          timeoutAfter(8000, 'MFA assurance level check'),
+        ])
         if (!active) return
         if (error) {
           console.error('Failed to check MFA assurance level', error)
@@ -83,12 +95,26 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
       return
     }
 
-    if (onboardingLoading || onboardingError || recheckingOnboarding) {
+    if (onboardingLoading || recheckingOnboarding) {
       setRedirecting(false)
       return
     }
 
     const onOnboardingPage = pathname?.startsWith('/app/onboarding')
+
+    // Fail closed: if we can't verify onboarding yet, send users to onboarding
+    // instead of rendering the main app shell.
+    if (onboardingError) {
+      if (onOnboardingPage) {
+        setRedirecting(false)
+        return
+      }
+
+      setRedirecting(true)
+      router.replace('/app/onboarding')
+      return
+    }
+
     if (onOnboardingPage || onboardingComplete) {
       setRedirecting(false)
       return
@@ -99,7 +125,12 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
       setRedirecting(false)
       setRecheckingOnboarding(true)
 
-      void refreshOnboardingSnapshot().finally(() => {
+      void Promise.race([
+        Promise.resolve(refreshOnboardingSnapshot()),
+        timeoutAfter(8000, 'Onboarding snapshot refresh'),
+      ]).catch((error) => {
+        console.error('Onboarding recheck timed out', error)
+      }).finally(() => {
         if (isMountedRef.current) {
           setRecheckingOnboarding(false)
         }
@@ -122,7 +153,7 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
     router,
   ])
 
-  if (loading || mfaChecking || (user && (onboardingLoading || recheckingOnboarding))) {
+  if (loading || (user && onboardingLoading)) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
@@ -135,6 +166,17 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
 
   if (!user) {
     return null
+  }
+
+  if (onboardingError && !pathname?.startsWith('/app/onboarding')) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto"></div>
+          <p className="mt-2 text-slate-600">Verifying onboarding access...</p>
+        </div>
+      </div>
+    )
   }
 
   if (redirecting) {

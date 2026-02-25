@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import {
   AlertCircle,
-  Calendar,
   CheckCircle2,
   ChevronRight,
   Circle,
@@ -25,7 +24,6 @@ import { calculateNextScheduledTime, cn } from '@/lib/utils'
 import { PricingCards } from '@/components/billing/PricingCards'
 import { TRIAL_PERIOD_DAYS, TRIAL_MINUTES, getPlanBySlug, formatPrice } from '@/config/plans'
 import {
-  ONBOARDING_STEPS,
   type OnboardingStepId,
   useB2COnboardingSnapshot,
 } from '@/hooks/useB2COnboarding'
@@ -159,7 +157,8 @@ export default function B2COnboardingPage() {
     isComplete, 
     completedCount: steps.filter(s => s.completed).length,
     billingParam,
-    hasSubscription: snapshot.hasSubscription
+    hasSubscription: snapshot.hasSubscription,
+    hasActiveSubscription: snapshot.hasActiveSubscription
   })
 
   useEffect(() => {
@@ -251,6 +250,15 @@ export default function B2COnboardingPage() {
               completed={stepMap.billing?.completed ?? false}
               billingParam={billingParam}
               onRefresh={refresh}
+              onContinue={() => setActiveStep('consent')}
+            />
+          )}
+
+          {activeStep === 'consent' && (
+            <ConsentActivationStep
+              snapshot={snapshot}
+              completed={stepMap.consent?.completed ?? false}
+              onRefresh={refresh}
               onContinue={() => router.push('/app/home')}
             />
           )}
@@ -300,7 +308,7 @@ function HeroCard({ progressPercent, completed }: { progressPercent: number; com
 interface ProgressRailProps {
   steps: { id: OnboardingStepId; title: string; helper: string; completed: boolean }[]
   activeStep: OnboardingStepId
-  onSelect: (id: OnboardingStepId) => void
+  onSelect: Dispatch<SetStateAction<OnboardingStepId>>
 }
 
 function ProgressRail({ steps, activeStep, onSelect }: ProgressRailProps) {
@@ -494,7 +502,7 @@ function ElderStep({
     setFeedback(null)
 
     try {
-      const payload = {
+      const basePayload = {
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         phone: form.phone,
@@ -504,13 +512,22 @@ function ElderStep({
         personal_info: form.personal.trim() || null,
         user_id: snapshot.profileId,
         active: true,
-      }
+        consent_pathway: 'direct_consent',
+        self_consent_capable_confirmed: true,
+        self_consent_capable_confirmed_at: new Date().toISOString(),
+      } as const
 
       if (existing?.id) {
-        const { error: updateError } = await supabase.from('elders').update(payload).eq('id', existing.id)
+        const { error: updateError } = await supabase.from('elders').update(basePayload).eq('id', existing.id)
         if (updateError) throw updateError
       } else {
-        const { error: insertError } = await supabase.from('elders').insert(payload).select('id').single()
+        const insertPayload = {
+          ...basePayload,
+          consent_status: 'pending',
+          consent_method: null,
+          consent_obtained_at: null,
+        }
+        const { error: insertError } = await supabase.from('elders').insert(insertPayload).select('id').single()
         if (insertError) throw insertError
       }
 
@@ -759,6 +776,7 @@ function ScheduleStep({
   }, [primarySchedule?.id])
 
   const elderId = snapshot.elder?.id ?? null
+  const consentGranted = snapshot.elder?.consent_status === 'granted'
 
   const toggleDay = (day: number) => {
     setForm((prev) => {
@@ -846,7 +864,7 @@ function ScheduleStep({
           .eq('status', 'pending')
 
         const nextCall = calculateNextScheduledTime(form.days, times)
-        if (nextCall) {
+        if (consentGranted && nextCall) {
           await supabase.from('call_executions').insert({
             elder_id: elderId,
             schedule_id: form.id,
@@ -883,7 +901,7 @@ function ScheduleStep({
         })
 
         const nextCall = calculateNextScheduledTime(form.days, times)
-        if (nextCall) {
+        if (consentGranted && nextCall) {
           await supabase.from('call_executions').insert({
             elder_id: elderId,
             schedule_id: schedule.id,
@@ -894,7 +912,12 @@ function ScheduleStep({
         }
       }
 
-      setMessage({ type: 'success', text: 'Schedule saved. Eva knows when to dial.' })
+      setMessage({
+        type: 'success',
+        text: consentGranted
+          ? 'Schedule saved. Eva knows when to dial.'
+          : 'Schedule saved. Calls will start automatically after recorded consent is confirmed.',
+      })
       await Promise.resolve(onSaved())
       onContinue()
     } catch (err) {
@@ -917,6 +940,12 @@ function ScheduleStep({
       {!elderId && (
         <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           Add the elder profile first, then you can craft the call plan.
+        </div>
+      )}
+
+      {elderId && !consentGranted && (
+        <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          You can set the schedule now. Eva will not place regular calls until recorded consent is marked as granted.
         </div>
       )}
 
@@ -1504,6 +1533,7 @@ function BillingStep({
 }) {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
+  const hasActiveSubscription = snapshot.hasActiveSubscription
 
   useEffect(() => {
     if (billingParam === 'success') {
@@ -1541,7 +1571,9 @@ function BillingStep({
     }
   }
 
-  const statusLabel = snapshot.hasSubscription ? formatSubscriptionStatus(snapshot.subscriptionStatus) : 'Pending'
+  const statusLabel = snapshot.subscriptionStatus
+    ? formatSubscriptionStatus(snapshot.subscriptionStatus)
+    : 'Pending'
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-sm">
@@ -1554,7 +1586,7 @@ function BillingStep({
 
       <div className="mt-5 space-y-4 text-sm text-slate-600">
         {/* Status banner for users who already have a subscription */}
-        {snapshot.hasSubscription && (
+        {(snapshot.hasSubscription || snapshot.subscriptionStatus) && (
           <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
             <p className="text-sm font-semibold text-slate-800">
               Status: <span className="text-slate-900">{statusLabel}</span>
@@ -1590,7 +1622,7 @@ function BillingStep({
         )}
 
         {/* Pricing cards for users without a subscription */}
-        {!snapshot.hasSubscription && (
+        {!hasActiveSubscription && (
           <div className="mt-2">
             <p className="mb-4 text-center text-xs text-slate-500">
               You won&apos;t be charged until your {TRIAL_PERIOD_DAYS}-day trial ends. Cancel anytime.
@@ -1635,10 +1667,131 @@ function BillingStep({
               onClick={onContinue}
               className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800"
             >
-              Go to dashboard
+              Continue to consent setup
               <ChevronRight className="ml-1 h-4 w-4" />
             </button>
           </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function ConsentActivationStep({
+  snapshot,
+  completed,
+  onRefresh,
+  onContinue,
+}: {
+  snapshot: B2COnboardingSnapshot
+  completed: boolean
+  onRefresh: () => void
+  onContinue: () => void
+}) {
+  const [refreshing, setRefreshing] = useState(false)
+  const elder = snapshot.elder
+  const consentStatus = elder?.consent_status ?? 'pending'
+  const hasBilling = snapshot.hasActiveSubscription
+
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    try {
+      await Promise.resolve(onRefresh())
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  const statusStyles =
+    consentStatus === 'granted'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+      : consentStatus === 'refused'
+        ? 'border-rose-200 bg-rose-50 text-rose-900'
+        : 'border-amber-200 bg-amber-50 text-amber-900'
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-sm">
+      <StepHeader
+        title="Consent activation"
+        helper="Recorded consent call must be completed before regular calls begin"
+        completed={completed}
+        icon={<ShieldCheck className="h-5 w-5" />}
+      />
+
+      <div className="mt-5 space-y-4">
+        {!elder && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Add the elder profile first so we can track consent status.
+          </div>
+        )}
+
+        {elder && (
+          <>
+            <div className={cn('rounded-2xl border px-4 py-3', statusStyles)}>
+              <p className="text-sm font-semibold">
+                Consent status: {consentStatus === 'granted' ? 'Granted' : consentStatus === 'refused' ? 'Refused' : 'Pending'}
+              </p>
+              <p className="mt-1 text-xs">
+                {consentStatus === 'granted'
+                  ? 'Recorded consent has been captured. Regular calls can now be scheduled.'
+                  : consentStatus === 'refused'
+                    ? 'Consent was refused. EvaCares will not start regular calls.'
+                    : 'A manual recorded consent call is required before any regular calls begin.'}
+              </p>
+              {elder.consent_decision_at && (
+                <p className="mt-1 text-xs opacity-80">
+                  Decision recorded: {format(new Date(elder.consent_decision_at), 'PPP p')}
+                </p>
+              )}
+            </div>
+
+            {!hasBilling && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                Billing still needs to be active before the service can start. Complete the billing step first, then return here.
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4">
+              <p className="text-sm font-semibold text-blue-900">What happens next</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
+                <li>EvaCares staff completes a recorded consent call with your family member.</li>
+                <li>We save the outcome and recording evidence securely.</li>
+                <li>As soon as consent is marked as granted, regular calls are scheduled automatically.</li>
+              </ol>
+              <p className="mt-2 text-xs text-blue-800">
+                We currently only support direct consent from the person receiving the calls.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {refreshing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Refreshing…
+                  </>
+                ) : (
+                  'Refresh consent status'
+                )}
+              </button>
+
+              {completed && (
+                <button
+                  type="button"
+                  onClick={onContinue}
+                  className="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-slate-800"
+                >
+                  Go to dashboard
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </>
         )}
       </div>
     </section>

@@ -21,35 +21,24 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  
-  // Consent checkboxes
-  const [familyConsent, setFamilyConsent] = useState(false)
-  const [callRecordingNotified, setCallRecordingNotified] = useState(false)
-  const [healthDataConsent, setHealthDataConsent] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [directConsentEligibleConfirmed, setDirectConsentEligibleConfirmed] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
     
-    // Validate consents
-    if (!healthDataConsent) {
-      setError('You must consent to health data processing to continue.')
+    if (!termsAccepted) {
+      setError('You must agree to the Terms of Service and Privacy Policy to continue.')
       setLoading(false)
       return
     }
 
-    if (formData.accountType === 'b2c') {
-      if (!familyConsent) {
-        setError('You must confirm family member consent to continue.')
-        setLoading(false)
-        return
-      }
-      if (!callRecordingNotified) {
-        setError('You must confirm the family member has been notified about call recording.')
-        setLoading(false)
-        return
-      }
+    if (formData.accountType === 'b2c' && !directConsentEligibleConfirmed) {
+      setError('Please confirm your family member can provide their own consent directly.')
+      setLoading(false)
+      return
     }
 
     try {
@@ -64,6 +53,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             first_name: formData.firstName,
             last_name: formData.lastName,
             account_type: formData.accountType,
+            self_consent_capable_signup: formData.accountType === 'b2c' ? directConsentEligibleConfirmed : null,
           },
         },
       })
@@ -75,7 +65,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
       if (data.user) {
         // Ensure user record exists/updates in our users table
-        const { data: userData, error: userError } = await supabase
+        const { error: userError } = await supabase
           .from('users')
           .upsert(
             {
@@ -84,14 +74,8 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
               first_name: formData.firstName,
               last_name: formData.lastName,
               account_type: formData.accountType,
-              terms_privacy_consent: true,
+              terms_privacy_consent: termsAccepted,
               terms_privacy_consent_timestamp: new Date().toISOString(),
-              family_consent_given: familyConsent,
-              family_consent_given_timestamp: familyConsent ? new Date().toISOString() : null,
-              call_recording_notified: callRecordingNotified,
-              call_recording_notified_timestamp: callRecordingNotified ? new Date().toISOString() : null,
-              health_data_processing_consent: healthDataConsent,
-              health_data_processing_consent_timestamp: healthDataConsent ? new Date().toISOString() : null,
             },
             { onConflict: 'auth_user_id' }
           )
@@ -104,7 +88,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
         setSuccess(true)
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -179,10 +163,12 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
           </div>
 
           {formData.accountType === 'b2c' && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
-              <p className="text-blue-800 text-xs">
-                Enter <strong>your details</strong> here. You'll add your loved one next.
-              </p>
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <p className="text-blue-800 text-xs">
+                  Enter <strong>your details</strong> here. You'll add your loved one next.
+                </p>
+              </div>
             </div>
           )}
 
@@ -270,45 +256,30 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
 
           <div className="space-y-4 pt-2">
             {formData.accountType === 'b2c' && (
-              <>
-                <div className="flex items-start gap-3">
-                  <input
-                    id="familyConsent"
-                    type="checkbox"
-                    checked={familyConsent}
-                    onChange={(e) => setFamilyConsent(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                  />
-                  <label htmlFor="familyConsent" className="text-sm text-gray-600 cursor-pointer select-none">
-                    I confirm my family member is aware of EvaCares and has agreed to receive calls from Eva
-                  </label>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <input
-                    id="callRecordingNotified"
-                    type="checkbox"
-                    checked={callRecordingNotified}
-                    onChange={(e) => setCallRecordingNotified(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                  />
-                  <label htmlFor="callRecordingNotified" className="text-sm text-gray-600 cursor-pointer select-none">
-                    I have informed them that calls will be recorded for safety and family updates
-                  </label>
-                </div>
-              </>
+              <div className="flex items-start gap-3">
+                <input
+                  id="directConsentEligibleConfirmed"
+                  type="checkbox"
+                  checked={directConsentEligibleConfirmed}
+                  onChange={(e) => setDirectConsentEligibleConfirmed(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                />
+                <label htmlFor="directConsentEligibleConfirmed" className="text-sm text-gray-600 cursor-pointer select-none">
+                  I confirm the person receiving calls can provide their own consent during a recorded setup call.
+                </label>
+              </div>
             )}
 
             <div className="flex items-start gap-3">
               <input
-                id="healthDataConsent"
+                id="termsAccepted"
                 type="checkbox"
-                checked={healthDataConsent}
-                onChange={(e) => setHealthDataConsent(e.target.checked)}
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
                 className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
               />
-              <label htmlFor="healthDataConsent" className="text-sm text-gray-600 cursor-pointer select-none">
-                I consent to processing health information (mood, pain, medication) for wellness monitoring
+              <label htmlFor="termsAccepted" className="text-sm text-gray-600 cursor-pointer select-none">
+                I agree to the EvaCares Terms of Service and Privacy Policy.
               </label>
             </div>
           </div>
@@ -334,9 +305,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
             <button
               type="submit"
               disabled={
-                loading ||
-                !healthDataConsent ||
-                (formData.accountType === 'b2c' && (!familyConsent || !callRecordingNotified))
+                loading || !termsAccepted || (formData.accountType === 'b2c' && !directConsentEligibleConfirmed)
               }
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-xl font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >

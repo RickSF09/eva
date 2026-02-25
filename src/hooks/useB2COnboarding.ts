@@ -2,10 +2,22 @@
 
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
+import { isSubscriptionActiveForAccess } from '@/lib/subscription'
 import type { Tables } from '@/types/database'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
-export type OnboardingStepId = 'elder' | 'schedule' | 'contact' | 'billing'
+const SNAPSHOT_QUERY_TIMEOUT_MS = 8000
+
+async function withTimeout<T>(promise: PromiseLike<T>, label: string, ms = SNAPSHOT_QUERY_TIMEOUT_MS): Promise<T> {
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    }),
+  ])
+}
+
+export type OnboardingStepId = 'elder' | 'schedule' | 'contact' | 'billing' | 'consent'
 
 export interface OnboardingStepDefinition {
   id: OnboardingStepId
@@ -22,11 +34,24 @@ export const ONBOARDING_STEPS: OnboardingStepDefinition[] = [
   { id: 'schedule', title: 'Call plan', helper: 'When to check in' },
   { id: 'contact', title: 'Emergency contact', helper: 'Who we alert' },
   { id: 'billing', title: 'Start Free Trial', helper: 'Enable calling' },
+  { id: 'consent', title: 'Consent activation', helper: 'Recorded consent before calls begin' },
 ]
 
 type ElderRecord = Pick<
   Tables<'elders'>,
-  'id' | 'first_name' | 'last_name' | 'phone' | 'address' | 'medical_conditions' | 'medications' | 'personal_info'
+  | 'id'
+  | 'first_name'
+  | 'last_name'
+  | 'phone'
+  | 'address'
+  | 'medical_conditions'
+  | 'medications'
+  | 'personal_info'
+  | 'consent_status'
+  | 'consent_pathway'
+  | 'consent_obtained_at'
+  | 'consent_decision_at'
+  | 'self_consent_capable_confirmed'
 >
 
 export interface ScheduleSummary {
@@ -58,7 +83,10 @@ export interface B2COnboardingSnapshot {
   subscriptionStatus: string | null
   subscriptionPlan: string | null
   subscriptionPeriodEnd: string | null
+  /** True when the user has any Stripe subscription record (including canceled). */
   hasSubscription: boolean
+  /** True when billing status should unlock B2C app access. */
+  hasActiveSubscription: boolean
 }
 
 const EMPTY_SNAPSHOT: B2COnboardingSnapshot = {
@@ -70,6 +98,7 @@ const EMPTY_SNAPSHOT: B2COnboardingSnapshot = {
   subscriptionPlan: null,
   subscriptionPeriodEnd: null,
   hasSubscription: false,
+  hasActiveSubscription: false,
 }
 
 export interface UseB2COnboardingOptions {
@@ -108,11 +137,14 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
     setError(null)
 
     try {
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile, error: profileError } = await withTimeout(
+        supabase
         .from('users')
         .select('id, subscription_status, subscription_plan, subscription_current_period_end, stripe_subscription_id')
         .eq('auth_user_id', user.id)
-        .maybeSingle()
+        .maybeSingle(),
+        'B2C onboarding profile query',
+      )
 
       if (profileError) {
         throw profileError
@@ -127,11 +159,16 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
       let schedules: ScheduleSummary[] = []
       let contacts: EmergencyContactSummary[] = []
 
-      const { data: elderData, error: elderError } = await supabase
+      const { data: elderData, error: elderError } = await withTimeout(
+        supabase
         .from('elders')
-        .select('id, first_name, last_name, phone, address, medical_conditions, medications, medications, personal_info')
+        .select(
+          'id, first_name, last_name, phone, address, medical_conditions, medications, personal_info, consent_status, consent_pathway, consent_obtained_at, consent_decision_at, self_consent_capable_confirmed',
+        )
         .eq('user_id', profile.id)
-        .maybeSingle()
+        .maybeSingle(),
+        'B2C onboarding elder query',
+      )
 
       if (elderError && elderError.code !== 'PGRST116') {
         throw elderError
@@ -140,7 +177,8 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
       if (elderData) {
         elder = elderData
 
-        const { data: scheduleRows, error: scheduleError } = await supabase
+        const { data: scheduleRows, error: scheduleError } = await withTimeout(
+          supabase
           .from('elder_call_schedules')
           .select(
             `
@@ -159,7 +197,9 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
           `,
           )
           .eq('elder_id', elderData.id)
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: true }),
+          'B2C onboarding schedules query',
+        )
 
         if (scheduleError) {
           throw scheduleError
@@ -182,7 +222,8 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
             } satisfies ScheduleSummary
           })?.filter((item): item is ScheduleSummary => Boolean(item)) ?? []
 
-        const { data: contactRows, error: contactError } = await supabase
+        const { data: contactRows, error: contactError } = await withTimeout(
+          supabase
           .from('elder_emergency_contact')
           .select(
             `
@@ -199,7 +240,9 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
           `,
           )
           .eq('elder_id', elderData.id)
-          .order('"priority order"', { ascending: true })
+          .order('"priority order"', { ascending: true }),
+          'B2C onboarding contacts query',
+        )
 
         if (contactError) {
           throw contactError
@@ -225,15 +268,18 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
         contacts = mappedContacts
       }
 
+      const subscriptionStatus = profile.subscription_status ?? null
+
       setSnapshot({
         profileId: profile.id,
         elder,
         schedules,
         contacts,
-        subscriptionStatus: profile.subscription_status ?? null,
+        subscriptionStatus,
         subscriptionPlan: profile.subscription_plan ?? null,
         subscriptionPeriodEnd: profile.subscription_current_period_end ?? null,
         hasSubscription: Boolean(profile.stripe_subscription_id),
+        hasActiveSubscription: isSubscriptionActiveForAccess(subscriptionStatus),
       })
     } catch (err) {
       console.error('Failed to load onboarding snapshot', err)
@@ -258,13 +304,18 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
     const elderComplete = Boolean(snapshot.elder?.first_name && snapshot.elder?.phone)
     const scheduleComplete = elderComplete && snapshot.schedules.length > 0
     const contactComplete = elderComplete && snapshot.contacts.length > 0
-    const billingComplete = snapshot.hasSubscription
+    const billingComplete = snapshot.hasActiveSubscription
+    const consentComplete =
+      elderComplete &&
+      billingComplete &&
+      snapshot.elder?.consent_status === 'granted'
 
     return {
       elder: elderComplete,
       schedule: scheduleComplete,
       contact: contactComplete,
       billing: billingComplete,
+      consent: consentComplete,
     } as Record<OnboardingStepId, boolean>
   }, [snapshot])
 
@@ -294,5 +345,3 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
     refresh: fetchSnapshot,
   }
 }
-
-

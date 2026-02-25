@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, AlertCircle, Clock, Calendar, Edit2, X, Trash2, Plus, Phone, User, GripVertical } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Clock, Calendar, Edit2, X, Trash2, Phone, User, GripVertical } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { EmergencyContactForm } from '@/components/emergency/EmergencyContactForm'
@@ -147,6 +147,7 @@ export default function B2CElderPage() {
   const [form, setForm] = useState<ElderFormState>(DEFAULT_ELDER)
   const [profileId, setProfileId] = useState<string | null>(null)
   const [elderId, setElderId] = useState<string | null>(null)
+  const [elderConsentStatus, setElderConsentStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState<Feedback>(null)
@@ -199,7 +200,7 @@ export default function B2CElderPage() {
 
         const { data: elder } = await supabase
           .from('elders')
-          .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info, preferences, eva_communication_style')
+          .select('id, first_name, last_name, phone, address, medical_conditions, medications, personal_info, preferences, eva_communication_style, consent_status')
           .eq('user_id', profile.id)
           .single()
 
@@ -207,6 +208,7 @@ export default function B2CElderPage() {
 
         if (elder) {
           setElderId(elder.id)
+          setElderConsentStatus(elder.consent_status ?? null)
           setForm({
             first_name: elder.first_name,
             last_name: elder.last_name,
@@ -224,6 +226,7 @@ export default function B2CElderPage() {
           fetchEmergencyContacts(elder.id)
         } else {
           setElderId(null)
+          setElderConsentStatus(null)
           setForm(DEFAULT_ELDER)
           setInitialPreferences(null)
           setInitialCommunicationStyle(null)
@@ -392,6 +395,7 @@ export default function B2CElderPage() {
 
         if (error) throw error
         setElderId(data.id)
+        setElderConsentStatus('pending')
         setFeedback({
           type: 'success',
           message: `${form.first_name.trim() || 'Profile'} created successfully. Next, set up their call schedule below.`,
@@ -532,6 +536,7 @@ export default function B2CElderPage() {
       // Always send days_of_week. Derive frequency: all 7 days => 'daily', otherwise 'custom'
       const derivedFrequency: ScheduleFrequency =
         scheduleForm.days.length === 7 ? 'daily' : 'custom'
+      const consentGranted = elderConsentStatus === 'granted'
 
       if (editingScheduleId) {
         // Update existing schedule
@@ -568,7 +573,7 @@ export default function B2CElderPage() {
         // Create new call_execution with updated schedule
         const nextScheduledTime = calculateNextScheduledTime(scheduleForm.days, times)
 
-        if (nextScheduledTime) {
+        if (consentGranted && nextScheduledTime) {
           const { error: executionError } = await supabase
             .from('call_executions')
             .insert({
@@ -585,7 +590,11 @@ export default function B2CElderPage() {
           }
         }
 
-        setScheduleSuccess('Schedule updated successfully.')
+        setScheduleSuccess(
+          consentGranted
+            ? 'Schedule updated successfully.'
+            : 'Schedule updated. Calls will be scheduled automatically after consent is granted.',
+        )
         setEditingScheduleId(null)
         setScheduleForm(DEFAULT_SCHEDULE)
         setShowScheduleForm(false)
@@ -622,7 +631,7 @@ export default function B2CElderPage() {
         // Create call_execution to start the calling sequence
         const nextScheduledTime = calculateNextScheduledTime(scheduleForm.days, times)
 
-        if (nextScheduledTime) {
+        if (consentGranted && nextScheduledTime) {
           const { error: executionError } = await supabase
             .from('call_executions')
             .insert({
@@ -639,7 +648,11 @@ export default function B2CElderPage() {
           }
         }
 
-        setScheduleSuccess('Schedule created and linked. Calls will now follow this plan.')
+        setScheduleSuccess(
+          consentGranted
+            ? 'Schedule created and linked. Calls will now follow this plan.'
+            : 'Schedule created and linked. Calls will start automatically after recorded consent is granted.',
+        )
         setScheduleForm(DEFAULT_SCHEDULE)
         setShowScheduleForm(false)
         fetchSchedules(elderId)
@@ -1591,5 +1604,3 @@ export default function B2CElderPage() {
     </div>
   )
 }
-
-

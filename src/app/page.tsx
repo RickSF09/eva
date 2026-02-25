@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useOrganizations } from '@/hooks/useOrganizations'
+import { useB2COnboardingSnapshot } from '@/hooks/useB2COnboarding'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SignUpForm } from '@/components/auth/SignUpForm'
 import { OrganizationSetup } from '@/components/onboarding/OrganizationSetup'
@@ -33,6 +34,12 @@ function HomeContent() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login')
   const [accountType, setAccountType] = useState<AccountType | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
+  const {
+    loading: b2cOnboardingLoading,
+    isComplete: b2cOnboardingComplete,
+  } = useB2COnboardingSnapshot({
+    enabled: Boolean(user && accountType === 'b2c'),
+  })
 
   // Check for password reset flow before any other logic
   useEffect(() => {
@@ -97,13 +104,27 @@ function HomeContent() {
     }
 
     if (accountType === 'b2c') {
-      router.replace('/app/home')
+      if (b2cOnboardingLoading) {
+        return
+      }
+      router.replace(b2cOnboardingComplete ? '/app/home' : '/app/onboarding')
     } else if (accountType === 'b2b' && !orgLoading) {
       if (organizations.length > 0) {
         router.replace('/b2b/dashboard')
       }
     }
-  }, [user, authLoading, profileLoading, accountType, orgLoading, organizations.length, router, searchParams])
+  }, [
+    user,
+    authLoading,
+    profileLoading,
+    accountType,
+    b2cOnboardingLoading,
+    b2cOnboardingComplete,
+    orgLoading,
+    organizations.length,
+    router,
+    searchParams,
+  ])
 
   const showOrganizationSetup = useMemo(() => {
     return (
@@ -130,7 +151,12 @@ function HomeContent() {
     )
   }
 
-  if (authLoading || profileLoading || (accountType === 'b2b' && orgLoading)) {
+  if (
+    authLoading ||
+    profileLoading ||
+    (accountType === 'b2b' && orgLoading) ||
+    (accountType === 'b2c' && user && b2cOnboardingLoading)
+  ) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
