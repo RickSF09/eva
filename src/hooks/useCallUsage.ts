@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
-import { getMinutesForPlan, TRIAL_MINUTES } from '@/config/plans'
+import { getMinutesForPlan } from '@/config/plans'
+import { getCurrentAllowanceWindow } from '@/lib/subscription'
 
 export interface CallUsage {
   /** Total minutes used in the current billing period (rounded up per call). */
@@ -16,9 +17,9 @@ export interface CallUsage {
   usagePercent: number
   /** Whether the user is on a trial. */
   isTrial: boolean
-  /** Billing period start (ISO string). */
+  /** Current allowance window start (ISO string). */
   periodStart: string | null
-  /** Billing period end (ISO string). */
+  /** Current allowance window end (ISO string). */
   periodEnd: string | null
   /** Number of calls in this period. */
   callCount: number
@@ -59,6 +60,7 @@ export function useCallUsage() {
           id,
           subscription_status,
           subscription_plan,
+          subscription_current_period_start,
           subscription_current_period_end,
           stripe_subscription_id
         `)
@@ -102,35 +104,59 @@ export function useCallUsage() {
         return
       }
 
-      // 3. Calculate billing period
-      const periodEnd = profile.subscription_current_period_end
-        ? new Date(profile.subscription_current_period_end)
-        : new Date()
+      // 3. Resolve the current allowance window from Stripe period bounds.
+      let allowanceWindow = getCurrentAllowanceWindow(
+        profile.subscription_current_period_start,
+        profile.subscription_current_period_end,
+      )
 
-      // Period start is 30 days before period end (monthly billing)
-      const periodStart = new Date(periodEnd)
-      periodStart.setDate(periodStart.getDate() - 30)
+      // Legacy fallback for users without the new period-start column populated yet.
+      if (!allowanceWindow && profile.subscription_current_period_end) {
+        const periodEnd = new Date(profile.subscription_current_period_end)
+        if (!Number.isNaN(periodEnd.getTime())) {
+          const fallbackStart = new Date(periodEnd)
+          fallbackStart.setUTCDate(fallbackStart.getUTCDate() - 30)
+          allowanceWindow = {
+            start: fallbackStart.toISOString(),
+            end: periodEnd.toISOString(),
+          }
+        }
+      }
 
-      // 4. Query call executions for this elder in the billing period
+      if (!allowanceWindow) {
+        const isTrial = profile.subscription_status === 'trialing'
+        const minutesIncluded = getMinutesForPlan(profile.subscription_plan, isTrial)
+        setUsage({
+          ...DEFAULT_USAGE,
+          minutesIncluded,
+          minutesRemaining: minutesIncluded,
+          isTrial,
+          periodStart: null,
+          periodEnd: profile.subscription_current_period_end,
+        })
+        setLoading(false)
+        return
+      }
+
+      // 4. Query call executions for this elder in the current allowance window.
       const { data: executions, error: execError } = await supabase
         .from('call_executions')
         .select('duration')
         .eq('elder_id', elder.id)
-        .gte('completed_at', periodStart.toISOString())
-        .lte('completed_at', periodEnd.toISOString())
+        .gte('completed_at', allowanceWindow.start)
+        .lt('completed_at', allowanceWindow.end)
         .not('duration', 'is', null)
 
       if (execError) {
         throw execError
       }
 
-      // 5. Calculate total minutes used (round up each call's duration)
-      const totalSeconds = (executions ?? []).reduce(
-        (sum, e) => sum + (typeof e.duration === 'number' ? e.duration : 0),
-        0
-      )
-      // Convert to minutes, rounding up to the nearest minute
-      const minutesUsed = Math.ceil(totalSeconds / 60)
+      // 5. Calculate total minutes used (round up each call individually).
+      const minutesUsed = (executions ?? []).reduce((sum, execution) => {
+        const duration = typeof execution.duration === 'number' ? execution.duration : 0
+        if (duration <= 0) return sum
+        return sum + Math.ceil(duration / 60)
+      }, 0)
 
       // 6. Get minutes included based on plan
       const isTrial = profile.subscription_status === 'trialing'
@@ -148,8 +174,8 @@ export function useCallUsage() {
         minutesRemaining,
         usagePercent,
         isTrial,
-        periodStart: periodStart.toISOString(),
-        periodEnd: profile.subscription_current_period_end,
+        periodStart: allowanceWindow.start,
+        periodEnd: allowanceWindow.end,
         callCount: executions?.length ?? 0,
       })
     } catch (err) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { stripe } from '@/lib/stripe-server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getPlanByPriceId } from '@/config/plans'
+import { mapStripeSubscriptionToUserFields } from '@/lib/stripe-subscription'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,30 +17,11 @@ function ensureWebhookSecret() {
 
 async function handleSubscriptionChange(subscription: Stripe.Subscription) {
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
-  const primaryItem = subscription.items.data.at(0)
-  const priceId = primaryItem?.price.id ?? null
-
-  // Resolve the plan slug from our config; fall back to nickname, then price ID
-  const configPlan = getPlanByPriceId(priceId)
-  const planSlug = configPlan?.slug ?? primaryItem?.price.nickname ?? priceId
-
-  // Stripe API 2026: current_period_end moved from Subscription to SubscriptionItem
-  const currentPeriodEnd =
-    primaryItem?.current_period_end ??
-    (subscription as { current_period_end?: number }).current_period_end
-  const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
+  const updatePayload = mapStripeSubscriptionToUserFields(subscription)
 
   const { error } = await supabaseAdmin
     .from('users')
-    .update({
-      stripe_subscription_id: subscription.id,
-      subscription_status: subscription.status,
-      subscription_plan: planSlug,
-      subscription_current_period_end: currentPeriodEnd
-        ? new Date(currentPeriodEnd * 1000).toISOString()
-        : null,
-      subscription_cancel_at_period_end: cancelAtPeriodEnd ?? false,
-    })
+    .update(updatePayload)
     .eq('stripe_customer_id', customerId)
 
   if (error) {
@@ -59,6 +40,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     .update({
       subscription_status: 'canceled',
       subscription_cancel_at_period_end: false,
+      subscription_current_period_start: null,
       subscription_current_period_end: endedAt
         ? new Date(endedAt * 1000).toISOString()
         : null,

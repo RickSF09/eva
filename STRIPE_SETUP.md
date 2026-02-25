@@ -139,4 +139,3 @@ This usually means:
 2. Check server logs for webhook processing errors
 3. Manually sync by clicking "Refresh" in the subscription UI
 4. Or use the sync endpoint: `POST /api/stripe/sync-from-checkout` with `sessionId`
-

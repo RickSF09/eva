@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe-server'
 import { createServerSupabase } from '@/lib/supabase-server'
-import { getPlanByPriceId } from '@/config/plans'
+import { mapStripeSubscriptionToUserFields } from '@/lib/stripe-subscription'
 
 /**
  * Re-fetches the user's subscription from Stripe and updates Supabase.
- * Use when webhooks missed an update or subscription_current_period_end is null.
+ * Use when webhooks missed an update or period bounds are stale/missing.
  */
 export async function POST() {
   try {
@@ -44,29 +44,11 @@ export async function POST() {
       )
     }
 
-    const primaryItem = subscription.items.data.at(0)
-    const priceId = primaryItem?.price.id ?? null
-
-    const configPlan = getPlanByPriceId(priceId)
-    const planSlug = configPlan?.slug ?? primaryItem?.price.nickname ?? priceId
-
-    // Stripe API 2026: current_period_end moved from Subscription to SubscriptionItem
-    const currentPeriodEnd =
-      primaryItem?.current_period_end ??
-      (subscription as { current_period_end?: number }).current_period_end
-    const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end as boolean | undefined
+    const updatePayload = mapStripeSubscriptionToUserFields(subscription)
 
     const { error: updateError } = await supabase
       .from('users')
-      .update({
-        stripe_subscription_id: subscription.id,
-        subscription_status: subscription.status,
-        subscription_plan: planSlug,
-        subscription_current_period_end: currentPeriodEnd
-          ? new Date(currentPeriodEnd * 1000).toISOString()
-          : null,
-        subscription_cancel_at_period_end: cancelAtPeriodEnd ?? false,
-      })
+      .update(updatePayload)
       .eq('id', profile.id)
 
     if (updateError) {
@@ -81,11 +63,10 @@ export async function POST() {
       success: true,
       subscription: {
         id: subscription.id,
-        status: subscription.status,
-        plan: planSlug,
-        currentPeriodEnd: currentPeriodEnd
-          ? new Date(currentPeriodEnd * 1000).toISOString()
-          : null,
+        status: updatePayload.subscription_status,
+        plan: updatePayload.subscription_plan,
+        currentPeriodStart: updatePayload.subscription_current_period_start,
+        currentPeriodEnd: updatePayload.subscription_current_period_end,
       },
     })
   } catch (err) {
