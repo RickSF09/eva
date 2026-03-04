@@ -1,6 +1,6 @@
 'use client'
 
-import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import {
@@ -140,6 +140,8 @@ const DEFAULT_CONTACT_FORM: ContactFormState = {
   email: '',
 }
 
+const COMPLETED_ONBOARDING_STAY_KEY = 'eva-b2c-onboarding-stay'
+
 // Plan config is centralised in @/config/plans.ts
 
 export default function B2COnboardingPage() {
@@ -149,6 +151,25 @@ export default function B2COnboardingPage() {
   const { snapshot, steps, loading, error, isComplete, nextStepId, refresh } = useB2COnboardingSnapshot()
   const [activeStep, setActiveStep] = useState<OnboardingStepId>('elder')
   const [initialized, setInitialized] = useState(false)
+  const hasResolvedCompletionRef = useRef(false)
+  const wasCompleteRef = useRef(false)
+
+  const clearCompletedOnboardingStay = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(COMPLETED_ONBOARDING_STAY_KEY)
+    }
+  }
+
+  const allowCompletedOnboardingStay = () => {
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(COMPLETED_ONBOARDING_STAY_KEY, '1')
+    }
+  }
+
+  const goToDashboard = () => {
+    clearCompletedOnboardingStay()
+    router.push('/app/home')
+  }
 
   console.log('B2COnboardingPage Render:', { 
     loading, 
@@ -167,6 +188,43 @@ export default function B2COnboardingPage() {
       setInitialized(true)
     }
   }, [loading, nextStepId, initialized])
+
+  useEffect(() => {
+    if (loading) return
+
+    if (!hasResolvedCompletionRef.current) {
+      hasResolvedCompletionRef.current = true
+      wasCompleteRef.current = isComplete
+
+      if (!isComplete) {
+        clearCompletedOnboardingStay()
+      }
+
+      return
+    }
+
+    if (!wasCompleteRef.current && isComplete) {
+      allowCompletedOnboardingStay()
+    }
+
+    if (!isComplete) {
+      clearCompletedOnboardingStay()
+    }
+
+    wasCompleteRef.current = isComplete
+  }, [loading, isComplete])
+
+  useEffect(() => {
+    if (loading || !isComplete) return
+    if (typeof window === 'undefined') return
+
+    const shouldStayOnCompletedOnboarding =
+      window.sessionStorage.getItem(COMPLETED_ONBOARDING_STAY_KEY) === '1'
+
+    if (!shouldStayOnCompletedOnboarding) {
+      router.replace('/app/home')
+    }
+  }, [loading, isComplete, router])
 
   useEffect(() => {
     if (billingParam) {
@@ -212,8 +270,11 @@ export default function B2COnboardingPage() {
         <section className="flex-1 space-y-6">
           {isComplete && (
             <CompletionBanner
-              onPrimary={() => router.push('/app/home')}
-              onSecondary={() => setActiveStep('elder')}
+              onPrimary={goToDashboard}
+              onSecondary={() => {
+                allowCompletedOnboardingStay()
+                setActiveStep('elder')
+              }}
             />
           )}
 
@@ -259,7 +320,7 @@ export default function B2COnboardingPage() {
               snapshot={snapshot}
               completed={stepMap.consent?.completed ?? false}
               onRefresh={refresh}
-              onContinue={() => router.push('/app/home')}
+              onContinue={goToDashboard}
             />
           )}
         </section>
@@ -1170,9 +1231,6 @@ function ScheduleStep({
         )}
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-slate-500">
-            Eva automatically calculates retries and next call windows.
-          </p>
           <div className="flex gap-2">
             <button
               type="submit"

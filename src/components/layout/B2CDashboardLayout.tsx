@@ -101,6 +101,7 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
     }
 
     const onOnboardingPage = pathname?.startsWith('/app/onboarding')
+    const onAppIndex = pathname === '/app'
 
     // Fail closed: if we can't verify onboarding yet, send users to onboarding
     // instead of rendering the main app shell.
@@ -115,7 +116,18 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
       return
     }
 
-    if (onOnboardingPage || onboardingComplete) {
+    if (onOnboardingPage) {
+      setRedirecting(false)
+      return
+    }
+
+    if (onboardingComplete) {
+      if (onAppIndex) {
+        setRedirecting(true)
+        router.replace('/app/home')
+        return
+      }
+
       setRedirecting(false)
       return
     }
@@ -184,7 +196,7 @@ export function B2CDashboardLayout({ children }: B2CDashboardLayoutProps) {
       <div className="flex h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-600 mx-auto"></div>
-          <p className="mt-2 text-slate-600">Taking you to onboarding...</p>
+          <p className="mt-2 text-slate-600">Redirecting to your workspace...</p>
         </div>
       </div>
     )
