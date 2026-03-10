@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       billing_records: {
@@ -469,70 +494,55 @@ export type Database = {
       }
       elder_analysis_reports: {
         Row: {
-          ai_concerns: Json | null
-          ai_early_warnings: Json | null
-          ai_narrative: string | null
-          ai_recommendations: Json | null
-          analysis_date: string
-          avg_energy_level: number | null
-          avg_mood_score: number | null
-          avg_pain_level: number | null
-          call_completion_rate: number | null
-          created_at: string | null
+          answered_calls_week: number
+          confidence: string
+          created_at: string
           elder_id: string
-          energy_trend: number | null
-          escalations_count: number | null
+          engagement_metrics: Json
+          generated_at: string
+          hours_called_week: number
           id: string
-          mood_trend: number | null
-          overall_health_score: number | null
-          pain_trend: number | null
-          period_days: number | null
-          risk_level: string | null
-          trend_direction: string | null
+          loneliness_metrics: Json
+          minutes_called_week: number
+          social_metrics: Json
+          supporting_health_metrics: Json
+          updated_at: string
+          week_end_utc: string
+          week_start_utc: string
         }
         Insert: {
-          ai_concerns?: Json | null
-          ai_early_warnings?: Json | null
-          ai_narrative?: string | null
-          ai_recommendations?: Json | null
-          analysis_date?: string
-          avg_energy_level?: number | null
-          avg_mood_score?: number | null
-          avg_pain_level?: number | null
-          call_completion_rate?: number | null
-          created_at?: string | null
+          answered_calls_week?: number
+          confidence?: string
+          created_at?: string
           elder_id: string
-          energy_trend?: number | null
-          escalations_count?: number | null
+          engagement_metrics?: Json
+          generated_at?: string
+          hours_called_week?: number
           id?: string
-          mood_trend?: number | null
-          overall_health_score?: number | null
-          pain_trend?: number | null
-          period_days?: number | null
-          risk_level?: string | null
-          trend_direction?: string | null
+          loneliness_metrics?: Json
+          minutes_called_week?: number
+          social_metrics?: Json
+          supporting_health_metrics?: Json
+          updated_at?: string
+          week_end_utc: string
+          week_start_utc: string
         }
         Update: {
-          ai_concerns?: Json | null
-          ai_early_warnings?: Json | null
-          ai_narrative?: string | null
-          ai_recommendations?: Json | null
-          analysis_date?: string
-          avg_energy_level?: number | null
-          avg_mood_score?: number | null
-          avg_pain_level?: number | null
-          call_completion_rate?: number | null
-          created_at?: string | null
+          answered_calls_week?: number
+          confidence?: string
+          created_at?: string
           elder_id?: string
-          energy_trend?: number | null
-          escalations_count?: number | null
+          engagement_metrics?: Json
+          generated_at?: string
+          hours_called_week?: number
           id?: string
-          mood_trend?: number | null
-          overall_health_score?: number | null
-          pain_trend?: number | null
-          period_days?: number | null
-          risk_level?: string | null
-          trend_direction?: string | null
+          loneliness_metrics?: Json
+          minutes_called_week?: number
+          social_metrics?: Json
+          supporting_health_metrics?: Json
+          updated_at?: string
+          week_end_utc?: string
+          week_start_utc?: string
         }
         Relationships: [
           {
@@ -695,6 +705,86 @@ export type Database = {
           },
         ]
       }
+      elder_trend_reports: {
+        Row: {
+          anchor_week_end_utc: string
+          anchor_week_start_utc: string
+          created_at: string
+          domain_trends: Json
+          elder_id: string
+          emerging_concerns: Json
+          follow_up_points: Json
+          generated_at: string
+          happy_moments: Json
+          id: string
+          improving_signals: Json
+          overall_trend_state: string
+          period_discussion_summary: string
+          remarkable_events: Json
+          source_call_count: number
+          source_week_count: number
+          trend_confidence: string
+          trend_features: Json
+          updated_at: string
+          weekly_series: Json
+          window_weeks: number
+        }
+        Insert: {
+          anchor_week_end_utc: string
+          anchor_week_start_utc: string
+          created_at?: string
+          domain_trends?: Json
+          elder_id: string
+          emerging_concerns?: Json
+          follow_up_points?: Json
+          generated_at?: string
+          happy_moments?: Json
+          id?: string
+          improving_signals?: Json
+          overall_trend_state: string
+          period_discussion_summary?: string
+          remarkable_events?: Json
+          source_call_count?: number
+          source_week_count?: number
+          trend_confidence: string
+          trend_features?: Json
+          updated_at?: string
+          weekly_series?: Json
+          window_weeks?: number
+        }
+        Update: {
+          anchor_week_end_utc?: string
+          anchor_week_start_utc?: string
+          created_at?: string
+          domain_trends?: Json
+          elder_id?: string
+          emerging_concerns?: Json
+          follow_up_points?: Json
+          generated_at?: string
+          happy_moments?: Json
+          id?: string
+          improving_signals?: Json
+          overall_trend_state?: string
+          period_discussion_summary?: string
+          remarkable_events?: Json
+          source_call_count?: number
+          source_week_count?: number
+          trend_confidence?: string
+          trend_features?: Json
+          updated_at?: string
+          weekly_series?: Json
+          window_weeks?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elder_trend_reports_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       elders: {
         Row: {
           active: boolean | null
@@ -705,7 +795,6 @@ export type Database = {
           consent_obtained_at: string | null
           consent_pathway: string
           consent_recorded_by: string | null
-          consent_recording_external_url: string | null
           consent_recording_storage_path: string | null
           consent_status: string
           created_at: string
@@ -735,7 +824,6 @@ export type Database = {
           consent_obtained_at?: string | null
           consent_pathway?: string
           consent_recorded_by?: string | null
-          consent_recording_external_url?: string | null
           consent_recording_storage_path?: string | null
           consent_status?: string
           created_at?: string
@@ -765,7 +853,6 @@ export type Database = {
           consent_obtained_at?: string | null
           consent_pathway?: string
           consent_recorded_by?: string | null
-          consent_recording_external_url?: string | null
           consent_recording_storage_path?: string | null
           consent_status?: string
           created_at?: string
@@ -1489,6 +1576,36 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_insights_cron_config: {
+        Row: {
+          auth_header: string | null
+          enabled: boolean
+          endpoint_url: string | null
+          id: boolean
+          run_trends: boolean
+          trend_window_weeks: number
+          updated_at: string
+        }
+        Insert: {
+          auth_header?: string | null
+          enabled?: boolean
+          endpoint_url?: string | null
+          id?: boolean
+          run_trends?: boolean
+          trend_window_weeks?: number
+          updated_at?: string
+        }
+        Update: {
+          auth_header?: string | null
+          enabled?: boolean
+          endpoint_url?: string | null
+          id?: boolean
+          run_trends?: boolean
+          trend_window_weeks?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       user_current_context: {
@@ -1509,6 +1626,74 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_elder_weekly_metrics: {
+        Row: {
+          answered_calls_week: number | null
+          avg_elder_talk_ratio: number | null
+          avg_engagement_rating: number | null
+          avg_isolation_risk_score: number | null
+          avg_loneliness_score: number | null
+          confidence: string | null
+          elder_id: string | null
+          hours_called_week: number | null
+          id: string | null
+          minutes_called_week: number | null
+          missing_people_rate: number | null
+          social_activities_mentioned_count: number | null
+          social_isolation_rate: number | null
+          support_system_strength_avg: number | null
+          unique_contact_mentions: number | null
+          week_end_utc: string | null
+          week_start_utc: string | null
+        }
+        Insert: {
+          answered_calls_week?: number | null
+          avg_elder_talk_ratio?: never
+          avg_engagement_rating?: never
+          avg_isolation_risk_score?: never
+          avg_loneliness_score?: never
+          confidence?: string | null
+          elder_id?: string | null
+          hours_called_week?: number | null
+          id?: string | null
+          minutes_called_week?: number | null
+          missing_people_rate?: never
+          social_activities_mentioned_count?: never
+          social_isolation_rate?: never
+          support_system_strength_avg?: never
+          unique_contact_mentions?: never
+          week_end_utc?: string | null
+          week_start_utc?: string | null
+        }
+        Update: {
+          answered_calls_week?: number | null
+          avg_elder_talk_ratio?: never
+          avg_engagement_rating?: never
+          avg_isolation_risk_score?: never
+          avg_loneliness_score?: never
+          confidence?: string | null
+          elder_id?: string | null
+          hours_called_week?: number | null
+          id?: string | null
+          minutes_called_week?: number | null
+          missing_people_rate?: never
+          social_activities_mentioned_count?: never
+          social_isolation_rate?: never
+          support_system_strength_avg?: never
+          unique_contact_mentions?: never
+          week_end_utc?: string | null
+          week_start_utc?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "elder_analysis_reports_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
             referencedColumns: ["id"]
           },
         ]
@@ -1559,11 +1744,15 @@ export type Database = {
           p_authorization: string
           p_limit?: number
           p_url: string
-          p_window?: unknown
+          p_window?: string
         }
         Returns: number
       }
       dispatch_scheduled_calls: { Args: never; Returns: number }
+      dispatch_weekly_insights_generation: {
+        Args: { p_week_start_utc?: string }
+        Returns: Json
+      }
       get_user_organizations: {
         Args: { p_auth_user_id?: string }
         Returns: {
@@ -1576,13 +1765,14 @@ export type Database = {
         Returns: string
       }
       requeue_stale_trial_reminders: {
-        Args: { p_stale?: unknown }
+        Args: { p_stale?: string }
         Returns: number
       }
       run_trial_reminder_tick: {
         Args: { p_authorization: string; p_url: string }
         Returns: Json
       }
+      run_weekly_insights_tick: { Args: never; Returns: Json }
       schedule_next_call: {
         Args: {
           p_base_time?: string
@@ -1594,6 +1784,10 @@ export type Database = {
       seed_pending_scheduled_calls_for_elder: {
         Args: { p_elder_id: string; p_from_ts?: string }
         Returns: number
+      }
+      send_consent_ops_slack_notification: {
+        Args: { p_event: string }
+        Returns: undefined
       }
       sync_trial_reminder_queue_from_users: {
         Args: { p_now?: string }
@@ -1761,6 +1955,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       call_direction: ["outbound", "inbound"],
