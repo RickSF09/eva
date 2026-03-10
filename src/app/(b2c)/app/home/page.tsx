@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { CallReportModal } from '@/components/calls/CallReportModal'
@@ -12,7 +12,6 @@ import {
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  ChevronUp,
   AlertTriangle,
   Phone,
   TrendingUp,
@@ -22,7 +21,7 @@ import {
   Heart,
   Sparkles,
 } from 'lucide-react'
-import { format, parseISO, startOfWeek, differenceInHours } from 'date-fns'
+import { format, parseISO, differenceInHours } from 'date-fns'
 import {
   ResponsiveContainer,
   LineChart,
@@ -31,7 +30,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
 } from 'recharts'
 
 // ---------------------------------------------------------------------------
@@ -95,6 +93,61 @@ interface EscalationIncident {
   created_at: string
 }
 
+type TrendState = 'improving' | 'stable' | 'declining' | 'volatile' | 'insufficient_data'
+type TrendConfidence = 'low' | 'medium' | 'high'
+type TrendDomainKey = 'loneliness' | 'social_connection' | 'engagement' | 'consistency'
+type TrendMetricKey =
+  | 'avg_loneliness_score'
+  | 'avg_isolation_risk_score'
+  | 'avg_engagement_rating'
+  | 'support_system_strength_avg'
+  | 'answered_calls_week'
+  | 'minutes_called_week'
+
+interface TrendDomainSummary {
+  state: TrendState
+}
+
+interface DomainTrends {
+  loneliness: TrendDomainSummary
+  social_connection: TrendDomainSummary
+  engagement: TrendDomainSummary
+  consistency: TrendDomainSummary
+}
+
+interface WeeklySeriesPoint {
+  week_start_utc: string
+  week_end_utc: string
+  avg_loneliness_score: number | null
+  avg_isolation_risk_score: number | null
+  avg_engagement_rating: number | null
+  answered_calls_week: number | null
+  minutes_called_week: number | null
+  support_system_strength_avg: number | null
+}
+
+interface TrendReportViewModel {
+  id: string
+  elder_id: string
+  anchor_week_start_utc: string
+  anchor_week_end_utc: string
+  window_weeks: number
+  source_week_count: number
+  source_call_count: number
+  overall_trend_state: TrendState
+  trend_confidence: TrendConfidence
+  domain_trends: DomainTrends
+  trend_features: Record<string, unknown>
+  weekly_series: WeeklySeriesPoint[]
+  period_discussion_summary: string
+  remarkable_events: string[]
+  happy_moments: string[]
+  follow_up_points: string[]
+  emerging_concerns: string[]
+  improving_signals: string[]
+  generated_at: string | null
+}
+
 type CallTypeFilter = 'all' | 'scheduled' | 'retry' | 'emergency_contact' | 'escalation_followup'
 
 const CALL_TYPE_FILTERS: { value: CallTypeFilter; label: string }[] = [
@@ -105,6 +158,201 @@ const CALL_TYPE_FILTERS: { value: CallTypeFilter; label: string }[] = [
   { value: 'escalation_followup', label: 'Escalation follow-up' },
 ]
 
+const TREND_METRIC_OPTIONS: Array<{
+  key: TrendMetricKey
+  label: string
+  color: string
+  kind: 'ratio' | 'count' | 'minutes'
+}> = [
+  { key: 'avg_loneliness_score', label: 'Loneliness score', color: '#475569', kind: 'ratio' },
+  { key: 'avg_isolation_risk_score', label: 'Isolation risk', color: '#f43f5e', kind: 'ratio' },
+  { key: 'avg_engagement_rating', label: 'Engagement rating', color: '#3b82f6', kind: 'ratio' },
+  { key: 'support_system_strength_avg', label: 'Support strength', color: '#4f46e5', kind: 'ratio' },
+  { key: 'answered_calls_week', label: 'Answered calls', color: '#0f766e', kind: 'count' },
+  { key: 'minutes_called_week', label: 'Minutes called', color: '#7c3aed', kind: 'minutes' },
+]
+
+const parseMaybeJson = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
+}
+
+const parseObject = (value: unknown): Record<string, unknown> => {
+  const parsed = parseMaybeJson(value)
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+  return parsed as Record<string, unknown>
+}
+
+const parseArray = (value: unknown): unknown[] => {
+  const parsed = parseMaybeJson(value)
+  return Array.isArray(parsed) ? parsed : []
+}
+
+const parseNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const n = Number(value.trim())
+    if (Number.isFinite(n)) return n
+  }
+  return null
+}
+
+const parseStringList = (value: unknown): string[] => {
+  return parseArray(value)
+    .map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (item && typeof item === 'object') {
+        const obj = item as Record<string, unknown>
+        if (typeof obj.title === 'string') return obj.title.trim()
+        if (typeof obj.message === 'string') return obj.message.trim()
+      }
+      return String(item ?? '').trim()
+    })
+    .filter(Boolean)
+}
+
+const parseTrendState = (value: unknown): TrendState => {
+  switch (String(value || '').toLowerCase()) {
+    case 'improving':
+      return 'improving'
+    case 'stable':
+      return 'stable'
+    case 'declining':
+      return 'declining'
+    case 'volatile':
+      return 'volatile'
+    default:
+      return 'insufficient_data'
+  }
+}
+
+const parseTrendConfidence = (value: unknown): TrendConfidence => {
+  switch (String(value || '').toLowerCase()) {
+    case 'high':
+      return 'high'
+    case 'medium':
+      return 'medium'
+    default:
+      return 'low'
+  }
+}
+
+const parseWeeklySeries = (value: unknown): WeeklySeriesPoint[] => {
+  return parseArray(value)
+    .map((item) => parseObject(item))
+    .map((seriesItem) => ({
+      week_start_utc: typeof seriesItem.week_start_utc === 'string' ? seriesItem.week_start_utc : '',
+      week_end_utc: typeof seriesItem.week_end_utc === 'string' ? seriesItem.week_end_utc : '',
+      avg_loneliness_score: parseNumber(seriesItem.avg_loneliness_score),
+      avg_isolation_risk_score: parseNumber(seriesItem.avg_isolation_risk_score),
+      avg_engagement_rating: parseNumber(seriesItem.avg_engagement_rating),
+      answered_calls_week: parseNumber(seriesItem.answered_calls_week),
+      minutes_called_week: parseNumber(seriesItem.minutes_called_week),
+      support_system_strength_avg: parseNumber(seriesItem.support_system_strength_avg),
+    }))
+    .sort((a, b) => (a.week_start_utc < b.week_start_utc ? -1 : 1))
+}
+
+const parseDomainTrends = (value: unknown): DomainTrends => {
+  const raw = parseObject(value)
+  const pickState = (key: TrendDomainKey): TrendDomainSummary => {
+    const domain = parseObject(raw[key])
+    return { state: parseTrendState(domain.state) }
+  }
+  return {
+    loneliness: pickState('loneliness'),
+    social_connection: pickState('social_connection'),
+    engagement: pickState('engagement'),
+    consistency: pickState('consistency'),
+  }
+}
+
+const normalizeTrendReport = (raw: any): TrendReportViewModel => {
+  return {
+    id: typeof raw.id === 'string' ? raw.id : '',
+    elder_id: typeof raw.elder_id === 'string' ? raw.elder_id : '',
+    anchor_week_start_utc: typeof raw.anchor_week_start_utc === 'string' ? raw.anchor_week_start_utc : '',
+    anchor_week_end_utc: typeof raw.anchor_week_end_utc === 'string' ? raw.anchor_week_end_utc : '',
+    window_weeks: parseNumber(raw.window_weeks) ?? 8,
+    source_week_count: parseNumber(raw.source_week_count) ?? 0,
+    source_call_count: parseNumber(raw.source_call_count) ?? 0,
+    overall_trend_state: parseTrendState(raw.overall_trend_state),
+    trend_confidence: parseTrendConfidence(raw.trend_confidence),
+    domain_trends: parseDomainTrends(raw.domain_trends),
+    trend_features: parseObject(raw.trend_features),
+    weekly_series: parseWeeklySeries(raw.weekly_series),
+    period_discussion_summary: typeof raw.period_discussion_summary === 'string' ? raw.period_discussion_summary : '',
+    remarkable_events: parseStringList(raw.remarkable_events),
+    happy_moments: parseStringList(raw.happy_moments),
+    follow_up_points: parseStringList(raw.follow_up_points),
+    emerging_concerns: parseStringList(raw.emerging_concerns),
+    improving_signals: parseStringList(raw.improving_signals),
+    generated_at: typeof raw.generated_at === 'string' ? raw.generated_at : null,
+  }
+}
+
+const formatStateLabel = (state: TrendState): string => {
+  switch (state) {
+    case 'insufficient_data':
+      return 'Insufficient data'
+    default:
+      return state.charAt(0).toUpperCase() + state.slice(1)
+  }
+}
+
+const stateBadgeClass = (state: TrendState, confidence: TrendConfidence): string => {
+  if (state === 'insufficient_data') return 'border border-slate-200 bg-slate-50 text-slate-700'
+  if (confidence === 'low') return 'border border-slate-200 bg-slate-50 text-slate-700'
+  switch (state) {
+    case 'improving':
+      return 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'stable':
+      return 'border border-blue-200 bg-blue-50 text-blue-700'
+    case 'volatile':
+      return 'border border-amber-200 bg-amber-50 text-amber-700'
+    case 'declining':
+      return 'border border-orange-200 bg-orange-50 text-orange-700'
+    default:
+      return 'border border-slate-200 bg-slate-50 text-slate-700'
+  }
+}
+
+const confidenceBadgeClass = (confidence: TrendConfidence): string => {
+  switch (confidence) {
+    case 'high':
+      return 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+    case 'medium':
+      return 'border border-amber-200 bg-amber-50 text-amber-700'
+    default:
+      return 'border border-slate-200 bg-slate-50 text-slate-700'
+  }
+}
+
+const formatWeekLabel = (value: string): string => {
+  if (!value) return 'Unknown'
+  const date = parseISO(value)
+  return Number.isNaN(date.getTime()) ? value : format(date, 'MMM d')
+}
+
+const formatWeekDateLong = (value: string): string => {
+  if (!value) return 'Unknown'
+  const date = parseISO(value)
+  return Number.isNaN(date.getTime()) ? value : format(date, 'MMM d, yyyy')
+}
+
+const formatMetricValueForTooltip = (key: TrendMetricKey, value: number | null): string => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 'N/A'
+  const metric = TREND_METRIC_OPTIONS.find((option) => option.key === key)
+  if (!metric) return String(value)
+  if (metric.kind === 'ratio') return `${Math.round(value * 100)}%`
+  if (metric.kind === 'minutes') return `${value.toFixed(1)} min`
+  return `${Math.round(value)}`
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -112,14 +360,13 @@ const CALL_TYPE_FILTERS: { value: CallTypeFilter; label: string }[] = [
 export default function B2CHomePage() {
   const { user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [elder, setElder] = useState<Elder | null>(null)
 
-  // Stats data (30-day window for charts + connection score)
+  // Stats data (30-day window for highlights + history context)
   const [statsReports, setStatsReports] = useState<CallReport[]>([])
-  // All call_executions in 30-day window (for connection score)
-  const [executions, setExecutions] = useState<any[]>([])
 
   // Paginated call history
   const [historyReports, setHistoryReports] = useState<CallReport[]>([])
@@ -130,10 +377,13 @@ export default function B2CHomePage() {
   const [activeRequests, setActiveRequests] = useState<any[]>([])
   const [openEscalations, setOpenEscalations] = useState<EscalationIncident[]>([])
   const [nextCall, setNextCall] = useState<any | null>(null)
-  const [aggregation, setAggregation] = useState<'day' | 'week'>('day')
+  const [trendReports, setTrendReports] = useState<TrendReportViewModel[]>([])
+  const [trendReportsLoading, setTrendReportsLoading] = useState(false)
+  const [selectedTrendMetric, setSelectedTrendMetric] = useState<TrendMetricKey>('avg_loneliness_score')
+  const [showTrendDetails, setShowTrendDetails] = useState(false)
+  const [showConnectionTrends, setShowConnectionTrends] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [callTypeFilter, setCallTypeFilter] = useState<CallTypeFilter>('all')
-  const [showInsights, setShowInsights] = useState(false)
   const itemsPerPage = 5
 
   const [resolvingId, setResolvingId] = useState<string | null>(null)
@@ -182,11 +432,12 @@ export default function B2CHomePage() {
           setProfile(null)
           setElder(null)
           setStatsReports([])
-          setExecutions([])
           setHistoryReports([])
           setHistoryTotal(0)
           setActiveRequests([])
           setOpenEscalations([])
+          setTrendReports([])
+          setTrendReportsLoading(false)
           return
         }
 
@@ -201,15 +452,31 @@ export default function B2CHomePage() {
         if (!elderRecord) {
           setElder(null)
           setStatsReports([])
-          setExecutions([])
           setHistoryReports([])
           setHistoryTotal(0)
           setActiveRequests([])
           setOpenEscalations([])
+          setTrendReports([])
+          setTrendReportsLoading(false)
           return
         }
 
         setElder(elderRecord)
+        setTrendReportsLoading(true)
+
+        const { data: trendRows, error: trendError } = await supabase
+          .from('elder_trend_reports')
+          .select('*')
+          .eq('elder_id', elderRecord.id)
+          .order('anchor_week_start_utc', { ascending: false })
+
+        if (trendError) {
+          console.error('Error fetching trend reports:', trendError)
+          if (active) setTrendReports([])
+        } else if (active) {
+          setTrendReports((trendRows || []).map(normalizeTrendReport))
+        }
+        if (active) setTrendReportsLoading(false)
 
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -240,16 +507,6 @@ export default function B2CHomePage() {
         })) as CallReport[]
 
         if (active) setStatsReports(formatted)
-
-        // Fetch all executions in window (for connection score)
-        const { data: execs } = await supabase
-          .from('call_executions')
-          .select('id, attempted_at, completed_at, duration, status, picked_up, call_type, scheduled_for')
-          .eq('elder_id', elderRecord.id)
-          .gte('created_at', thirtyDaysAgo)
-          .order('scheduled_for', { ascending: false })
-
-        if (active) setExecutions(execs || [])
 
         // Active requests
         const { data: requests } = await supabase
@@ -302,7 +559,10 @@ export default function B2CHomePage() {
           }
         }
       } finally {
-        if (active) setLoading(false)
+        if (active) {
+          setLoading(false)
+          setTrendReportsLoading(false)
+        }
       }
     }
 
@@ -373,102 +633,30 @@ export default function B2CHomePage() {
   useEffect(() => { setCurrentPage(1) }, [callTypeFilter])
 
   // ---------------------------------------------------------------------------
-  // Computed: Connection Score
+  // Computed: Trend insights
   // ---------------------------------------------------------------------------
-  const connectionScore = useMemo(() => {
-    if (executions.length === 0) return null
+  const currentTrendReport = trendReports[0] ?? null
+  const showTrendDebug = searchParams.get('debug') === '1'
+  const isBuildingBaseline = Boolean(
+    currentTrendReport
+      && (
+        currentTrendReport.overall_trend_state === 'insufficient_data'
+        || currentTrendReport.source_week_count < 4
+      ),
+  )
 
-    const total = executions.length
-    const completed = executions.filter(
-      (e) => e.status === 'completed' && e.picked_up === true,
-    )
-    const completionRate = total > 0 ? completed.length / total : 0
+  const selectedTrendMetricOption = useMemo(
+    () => TREND_METRIC_OPTIONS.find((option) => option.key === selectedTrendMetric) || TREND_METRIC_OPTIONS[0],
+    [selectedTrendMetric],
+  )
 
-    const durations = completed
-      .map((e) => Number(e.duration))
-      .filter((d) => d > 0)
-    const avgDuration = durations.length > 0
-      ? durations.reduce((a, b) => a + b, 0) / durations.length
-      : 0
-
-    // Days connected this week
-    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-    const daysThisWeek = new Set(
-      completed
-        .filter((e) => e.completed_at && new Date(e.completed_at).getTime() > sevenDaysAgo)
-        .map((e) => format(parseISO(e.completed_at!), 'yyyy-MM-dd')),
-    ).size
-
-    // Missed call streak (from most recent going backwards)
-    let missedStreak = 0
-    const sorted = [...executions].sort(
-      (a, b) => new Date(b.scheduled_for || b.created_at).getTime() - new Date(a.scheduled_for || a.created_at).getTime(),
-    )
-    for (const e of sorted) {
-      if (e.status === 'completed' && e.picked_up === true) break
-      if (e.status !== 'pending') missedStreak++
-    }
-
-    // Overall score: weighted combination
-    const engagementRatings = statsReports
-      .map((r) => r.conversation_quality?.engagement_rating)
-      .filter((v): v is number => typeof v === 'number')
-    const avgEngagement = engagementRatings.length > 0
-      ? engagementRatings.reduce((a, b) => a + b, 0) / engagementRatings.length
-      : 0.5
-
-    // Score = 40% completion + 30% engagement + 20% duration_factor + 10% recency
-    const durationFactor = Math.min(avgDuration / 300, 1) // normalise to 5 min ideal
-    const recencyFactor = daysThisWeek / 7
-    const score = Math.round(
-      (completionRate * 0.4 + avgEngagement * 0.3 + durationFactor * 0.2 + recencyFactor * 0.1) * 100,
-    )
-
-    return {
-      score: Math.min(100, Math.max(0, score)),
-      completionRate: Math.round(completionRate * 100),
-      avgDuration: Math.round(avgDuration),
-      daysThisWeek,
-      missedStreak,
-    }
-  }, [executions, statsReports])
-
-  // ---------------------------------------------------------------------------
-  // Computed: Engagement Trend chart data
-  // ---------------------------------------------------------------------------
-  const trendData = useMemo(() => {
-    const buckets: Record<string, { label: string; engagementSum: number; engagementCount: number; isolationSum: number; isolationCount: number }> = {}
-
-    for (const r of statsReports) {
-      const attemptedAt = r.call_executions?.attempted_at
-      if (!attemptedAt) continue
-
-      const dt = parseISO(attemptedAt)
-      const keyDay = format(dt, 'yyyy-MM-dd')
-      const keyWeek = format(startOfWeek(dt, { weekStartsOn: 1 }), 'yyyy-ww')
-      const bucketKey = aggregation === 'day' ? keyDay : keyWeek
-      const label = aggregation === 'day'
-        ? format(dt, 'MMM d')
-        : `Wk of ${format(startOfWeek(dt, { weekStartsOn: 1 }), 'MMM d')}`
-
-      const b = (buckets[bucketKey] ||= { label, engagementSum: 0, engagementCount: 0, isolationSum: 0, isolationCount: 0 })
-
-      const eng = r.conversation_quality?.engagement_rating
-      if (typeof eng === 'number') { b.engagementSum += eng; b.engagementCount++ }
-
-      const iso = r.loneliness_indicators?.isolation_risk_score
-      if (typeof iso === 'number') { b.isolationSum += iso; b.isolationCount++ }
-    }
-
-  return Object.entries(buckets)
-    .map(([key, v]) => ({
-      key,
-      label: v.label,
-      engagement: v.engagementCount > 0 ? +(v.engagementSum / v.engagementCount).toFixed(2) : null,
-        isolationRisk: v.isolationCount > 0 ? +(v.isolationSum / v.isolationCount).toFixed(2) : null,
-      }))
-      .sort((a, b) => (a.key < b.key ? -1 : 1))
-  }, [statsReports, aggregation])
+  const selectedTrendSeries = useMemo(() => {
+    if (!currentTrendReport) return []
+    return currentTrendReport.weekly_series.map((point) => ({
+      week_start_utc: point.week_start_utc,
+      value: point[selectedTrendMetric],
+    }))
+  }, [currentTrendReport, selectedTrendMetric])
 
   const parseScheduledFor = (value?: string | null) => {
     if (!value) return null
@@ -507,6 +695,10 @@ export default function B2CHomePage() {
   const nextCallDate = parseScheduledFor(highlights.nextCall?.scheduled_for)
 
   const attentionCount = activeRequests.length + openEscalations.length
+  const recentEscalations = useMemo(
+    () => openEscalations.filter((esc) => differenceInHours(new Date(), parseISO(esc.created_at)) <= 7 * 24),
+    [openEscalations],
+  )
 
   const latestPositiveMoment = useMemo(() => {
     const firstMoment = highlights.moments[0]
@@ -618,18 +810,6 @@ export default function B2CHomePage() {
     }
   }
 
-  const scoreColor = (score: number) => {
-    if (score >= 70) return 'text-emerald-600'
-    if (score >= 40) return 'text-amber-600'
-    return 'text-rose-600'
-  }
-
-  const scoreRingColor = (score: number) => {
-    if (score >= 70) return 'stroke-emerald-500'
-    if (score >= 40) return 'stroke-amber-500'
-    return 'stroke-rose-500'
-  }
-
   const formatLastCheckIn = (value?: string | null) => {
     if (!value) return 'No completed check-in yet'
     const callDate = parseISO(value)
@@ -684,14 +864,14 @@ export default function B2CHomePage() {
       </section>
 
       {/* ================================================================= */}
-      {/* 1. Care Snapshot                                                  */}
+      {/* 1. Snapshot                                                       */}
       {/* ================================================================= */}
       <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
               <Heart className="h-5 w-5 text-rose-500" />
-              Care Snapshot
+              Snapshot
             </h2>
             <p className="mt-1 text-sm text-slate-600">{reassuranceMessage}</p>
           </div>
@@ -728,141 +908,260 @@ export default function B2CHomePage() {
             </p>
           </div>
         </div>
+
+        {(latestPositiveMoment || highlights.lastCall) && (
+          <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <Sparkles className="h-4 w-4 text-emerald-600" />
+                  Recent Highlight
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-700">
+                  {latestPositiveMoment?.quote
+                    ? `"${latestPositiveMoment.quote}"`
+                    : (highlights.lastCall?.summary || 'No summary available')}
+                </p>
+                {latestPositiveMoment?.context && (
+                  <p className="mt-2 text-xs text-slate-500">{latestPositiveMoment.context}</p>
+                )}
+              </div>
+              {highlights.lastCall && (
+                <button
+                  onClick={() => setSelectedReport(highlights.lastCall!)}
+                  className="inline-flex items-center gap-1 self-start rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Open report
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ================================================================= */}
-      {/* 2. Recent Highlight                                               */}
+      {/* 2. Connection Trends                                              */}
       {/* ================================================================= */}
-      {(latestPositiveMoment || highlights.lastCall) && (
-        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-emerald-600" />
-                Recent Highlight
-              </h2>
-              <p className="mt-3 text-sm text-slate-700 leading-relaxed">
-                {latestPositiveMoment?.quote
-                  ? `"${latestPositiveMoment.quote}"`
-                  : (highlights.lastCall?.summary || 'No summary available')}
-              </p>
-              {latestPositiveMoment?.context && (
-                <p className="mt-2 text-xs text-slate-500">{latestPositiveMoment.context}</p>
-              )}
-            </div>
-            {highlights.lastCall && (
-              <button
-                onClick={() => setSelectedReport(highlights.lastCall!)}
-                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Open report
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ================================================================= */}
-      {/* 3. Detailed Insights (expandable)                                 */}
-      {/* ================================================================= */}
-      {(connectionScore || trendData.length > 1) && (
-        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
-          <button
-            type="button"
-            onClick={() => setShowInsights((prev) => !prev)}
-            className="flex w-full items-center justify-between gap-3 text-left"
+      {elder && (
+        <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-white to-slate-50/70 px-6 py-5 shadow-sm">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500/40 via-emerald-500/30 to-transparent" />
+          <div
+            role="button"
+            tabIndex={0}
+            aria-expanded={showConnectionTrends}
+            onClick={() => setShowConnectionTrends((prev) => !prev)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                setShowConnectionTrends((prev) => !prev)
+              }
+            }}
+            className="flex cursor-pointer flex-col gap-3 md:flex-row md:items-start md:justify-between"
           >
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Detailed Insights</h2>
-              <p className="text-sm text-slate-600">Optional trends and deeper metrics.</p>
+              <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight text-slate-900">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-blue-50">
+                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                </span>
+                Trends
+              </h2>
+              {currentTrendReport ? (
+                <>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Based on {currentTrendReport.source_week_count} of last {currentTrendReport.window_weeks} weeks, {currentTrendReport.source_call_count} answered calls
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Generated {currentTrendReport.generated_at ? formatDateTime(currentTrendReport.generated_at) : 'Unknown'}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1 text-sm text-slate-600">
+                  Trend insights are generated from weekly snapshots.
+                </p>
+              )}
             </div>
-            {showInsights ? (
-              <ChevronUp className="h-5 w-5 text-slate-500" />
-            ) : (
-              <ChevronDown className="h-5 w-5 text-slate-500" />
-            )}
-          </button>
-
-          {showInsights && (
-            <div className="mt-5 space-y-6 border-t border-slate-100 pt-5">
-              {connectionScore && (
-                <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-4">
-                  <h3 className="mb-4 text-sm font-semibold text-slate-900">Connection Overview</h3>
-                  <div className="flex flex-col items-center gap-6 lg:flex-row">
-                    <div className="relative flex-shrink-0">
-                      <svg className="h-24 w-24 -rotate-90" viewBox="0 0 120 120">
-                        <circle cx="60" cy="60" r="52" fill="none" strokeWidth="10" className="stroke-slate-200" />
-                        <circle
-                          cx="60" cy="60" r="52" fill="none" strokeWidth="10"
-                          className={scoreRingColor(connectionScore.score)}
-                          strokeLinecap="round"
-                          strokeDasharray={`${(connectionScore.score / 100) * 327} 327`}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className={`text-2xl font-bold ${scoreColor(connectionScore.score)}`}>
-                          {connectionScore.score}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid w-full grid-cols-2 gap-3">
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-xs text-slate-500">Completed calls</p>
-                        <p className="text-base font-semibold text-slate-900">{connectionScore.completionRate}%</p>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-xs text-slate-500">Average call length</p>
-                        <p className="text-base font-semibold text-slate-900">{formatDuration(connectionScore.avgDuration)}</p>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-xs text-slate-500">Check-ins this week</p>
-                        <p className="text-base font-semibold text-slate-900">{connectionScore.daysThisWeek} / 7</p>
-                      </div>
-                      <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <p className="text-xs text-slate-500">Calls needing retry</p>
-                        <p className={`text-base font-semibold ${connectionScore.missedStreak > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                          {connectionScore.missedStreak}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+            <div className="flex items-center gap-2">
+              {currentTrendReport && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${stateBadgeClass(currentTrendReport.overall_trend_state, currentTrendReport.trend_confidence)}`}>
+                    Trend: {formatStateLabel(currentTrendReport.overall_trend_state)}
+                  </span>
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${confidenceBadgeClass(currentTrendReport.trend_confidence)}`}>
+                    Confidence: {currentTrendReport.trend_confidence.toUpperCase()}
+                  </span>
                 </div>
               )}
+              <ChevronDown className={`h-5 w-5 text-slate-500 transition-transform ${showConnectionTrends ? 'rotate-180' : ''}`} />
+            </div>
+          </div>
 
-              {trendData.length > 1 && (
-                <div>
-                  <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-600" />
-                      Well-being Trend
+          {showConnectionTrends && (
+            <>
+              {trendReportsLoading ? (
+                <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading trend insights…
+                </div>
+              ) : !currentTrendReport ? (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                  No trend reports are available yet.
+                </div>
+              ) : (
+                <div className="mt-5 space-y-4">
+                  {isBuildingBaseline && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                      <p className="flex items-center gap-2 text-sm font-medium text-rose-700">
+                        <AlertTriangle className="h-4 w-4 text-rose-600" />
+                        Need 4 weeks of data for reliable analysis.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                      <Sparkles className="h-4 w-4 text-indigo-600" />
+                      What Was Discussed
                     </h3>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setAggregation('day')} className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${aggregation === 'day' ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Daily</button>
-                      <button onClick={() => setAggregation('week')} className={`px-3 py-1 text-xs font-medium rounded-lg border transition-colors ${aggregation === 'week' ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Weekly</button>
+                    <p className="mt-2 text-sm leading-7 text-slate-700">
+                      {currentTrendReport.period_discussion_summary || 'No period summary available.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      {TREND_METRIC_OPTIONS.map((metric) => (
+                        <button
+                          key={metric.key}
+                          onClick={() => setSelectedTrendMetric(metric.key)}
+                          className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            selectedTrendMetric === metric.key
+                              ? 'border-slate-900 bg-slate-900 text-white'
+                              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          {metric.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={selectedTrendSeries} margin={{ left: 0, right: 0, top: 10, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis
+                            dataKey="week_start_utc"
+                            tick={{ fontSize: 10, fill: '#64748b' }}
+                            tickFormatter={formatWeekLabel}
+                            interval="preserveStartEnd"
+                            axisLine={false}
+                            tickLine={false}
+                            dy={8}
+                          />
+                          <YAxis
+                            tick={{ fontSize: 10, fill: '#64748b' }}
+                            axisLine={false}
+                            tickLine={false}
+                            tickFormatter={(v) => {
+                              if (selectedTrendMetricOption.kind === 'ratio') return `${Math.round((v || 0) * 100)}%`
+                              if (selectedTrendMetricOption.kind === 'minutes') return `${v}`
+                              return `${Math.round(v || 0)}`
+                            }}
+                          />
+                          <Tooltip
+                            labelFormatter={(label) => formatWeekDateLong(String(label))}
+                            formatter={(value: number | null) => [formatMetricValueForTooltip(selectedTrendMetric, value), selectedTrendMetricOption.label]}
+                            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="value"
+                            stroke={selectedTrendMetricOption.color}
+                            strokeWidth={2.5}
+                            dot={{ r: 3, strokeWidth: 0, fill: selectedTrendMetricOption.color }}
+                            connectNulls
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
 
-                  <div className="h-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={trendData} margin={{ left: 0, right: 0, top: 5, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#64748b' }} interval="preserveStartEnd" axisLine={false} tickLine={false} dy={10} />
-                        <YAxis domain={[0, 1]} ticks={[0, 0.25, 0.5, 0.75, 1]} tickFormatter={(v) => `${Math.round(v * 100)}%`} width={40} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <Tooltip
-                          formatter={(v: any, name: string) => [`${Math.round(v * 100)}%`, name === 'engagement' ? 'Engagement' : 'Isolation risk']}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                        />
-                        <Legend verticalAlign="top" height={30} iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
-                        <Line name="Engagement" type="monotone" dataKey="engagement" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3, fill: '#3b82f6', strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
-                        <Line name="Isolation Risk" type="monotone" dataKey="isolationRisk" stroke="#f43f5e" strokeWidth={2} strokeDasharray="5 5" dot={{ r: 3, fill: '#f43f5e', strokeWidth: 0 }} activeDot={{ r: 5 }} connectNulls />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={showTrendDetails}
+                    onClick={() => setShowTrendDetails((prev) => !prev)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        setShowTrendDetails((prev) => !prev)
+                      }
+                    }}
+                    className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-3 hover:bg-slate-50/60"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                          <AlertTriangle className="h-4 w-4 text-amber-600" />
+                          Detailed Trend Notes
+                        </h3>
+                        <p className="mt-1 text-xs text-slate-500">Remarkable events, moments, follow-ups and signals</p>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${showTrendDetails ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {showTrendDetails && (
+                      <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                        {[
+                          { title: 'Remarkable Events', items: currentTrendReport.remarkable_events, emptyText: 'No remarkable events noted.', Icon: Sparkles, iconClass: 'text-violet-600', dotClass: 'bg-violet-500', cardClass: 'bg-violet-50/40 border-violet-200' },
+                          { title: 'Happy Moments', items: currentTrendReport.happy_moments, emptyText: 'No happy moments captured.', Icon: Heart, iconClass: 'text-rose-600', dotClass: 'bg-rose-500', cardClass: 'bg-rose-50/40 border-rose-200' },
+                          { title: 'Follow-up Points', items: currentTrendReport.follow_up_points, emptyText: 'No follow-up points listed.', Icon: Clock, iconClass: 'text-blue-600', dotClass: 'bg-blue-500', cardClass: 'bg-blue-50/40 border-blue-200' },
+                          { title: 'Emerging Concerns', items: currentTrendReport.emerging_concerns, emptyText: 'No emerging concerns listed.', Icon: AlertTriangle, iconClass: 'text-amber-600', dotClass: 'bg-amber-500', cardClass: 'bg-amber-50/40 border-amber-200' },
+                          { title: 'Improving Signals', items: currentTrendReport.improving_signals, emptyText: 'No improving signals listed.', Icon: TrendingUp, iconClass: 'text-emerald-600', dotClass: 'bg-emerald-500', cardClass: 'bg-emerald-50/40 border-emerald-200' },
+                        ].map((section) => (
+                          <div key={section.title} className={`rounded-lg border px-3 py-2.5 ${section.cardClass}`}>
+                            <h4 className="flex items-center gap-1.5 text-sm font-medium text-slate-800">
+                              <section.Icon className={`h-3.5 w-3.5 ${section.iconClass}`} />
+                              {section.title}
+                            </h4>
+                            {section.items.length > 0 ? (
+                              <ul className="mt-2 space-y-2">
+                                {section.items.map((item, idx) => (
+                                  <li key={`${section.title}-${idx}`} className="flex items-start gap-2.5 text-sm leading-6 text-slate-700">
+                                    <span className={`mt-2 h-1.5 w-1.5 flex-none rounded-full ${section.dotClass}`} />
+                                    <span>{item}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-2 text-sm text-slate-500">{section.emptyText}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {showTrendDebug && (
+                    <details className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                        Debug info
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Domain trends</p>
+                          <pre className="mt-1 overflow-x-auto rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700">{JSON.stringify(currentTrendReport.domain_trends, null, 2)}</pre>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Trend features</p>
+                          <pre className="mt-1 overflow-x-auto rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700">{JSON.stringify(currentTrendReport.trend_features, null, 2)}</pre>
+                        </div>
+                      </div>
+                    </details>
+                  )}
                 </div>
               )}
-            </div>
+            </>
           )}
         </section>
       )}
@@ -937,14 +1236,14 @@ export default function B2CHomePage() {
       {/* ================================================================= */}
       {/* 5. Escalations & Follow-Ups (conditional)                        */}
       {/* ================================================================= */}
-      {openEscalations.length > 0 && (
+      {recentEscalations.length > 0 && (
         <section className="rounded-2xl border border-red-200 bg-red-50 px-6 py-5 shadow-sm">
           <div className="flex items-center gap-2 mb-3">
             <AlertTriangle className="h-5 w-5 text-red-600" />
-            <h2 className="text-lg font-semibold text-red-900">Open Escalations</h2>
+            <h2 className="text-lg font-semibold text-red-900">Recent Escalations</h2>
           </div>
           <div className="space-y-3">
-            {openEscalations.map((esc) => (
+            {recentEscalations.map((esc) => (
               <div
                 key={esc.id}
                 className="bg-white border border-red-100 rounded-xl p-4"
