@@ -353,6 +353,18 @@ const formatMetricValueForTooltip = (key: TrendMetricKey, value: number | null):
   return `${Math.round(value)}`
 }
 
+const normalizeTooltipMetricValue = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  if (Array.isArray(value) && value.length > 0) {
+    return normalizeTooltipMetricValue(value[0])
+  }
+  return null
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -1070,7 +1082,10 @@ export default function B2CHomePage() {
                           />
                           <Tooltip
                             labelFormatter={(label) => formatWeekDateLong(String(label))}
-                            formatter={(value: number | null) => [formatMetricValueForTooltip(selectedTrendMetric, value), selectedTrendMetricOption.label]}
+                            formatter={(value) => [
+                              formatMetricValueForTooltip(selectedTrendMetric, normalizeTooltipMetricValue(value)),
+                              selectedTrendMetricOption.label,
+                            ]}
                             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px' }}
                           />
                           <Line
