@@ -150,12 +150,20 @@ export default function InternalConsentPage() {
               Record manual consent call outcomes. When consent is granted, the database automatically schedules pending calls.
             </p>
           </div>
-          <a
-            href="/app/home"
-            className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Back to app
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="/internal/impersonate"
+              className="inline-flex items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              Impersonate user
+            </a>
+            <a
+              href="/app/home"
+              className="inline-flex items-center justify-center rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Back to app
+            </a>
+          </div>
         </div>
       </section>
 
