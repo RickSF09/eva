@@ -152,6 +152,12 @@ export default function InternalConsentPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <a
+              href="/internal/demo-recordings"
+              className="inline-flex items-center justify-center rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              Demo recordings
+            </a>
+            <a
               href="/internal/impersonate"
               className="inline-flex items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100"
             >
