@@ -1392,44 +1392,47 @@ export type Database = {
       user_notification_prefs: {
         Row: {
           created_at: string
-          email_cadence: string
           id: string
           include_recording: boolean
           include_transcript: boolean
           only_if_call: boolean
+          per_call_email_enabled: boolean
           send_time_local: string
           timezone: string
           to_emails: Json | null
           updated_at: string
           user_id: string
+          weekly_email_enabled: boolean
           weekly_day_of_week: number | null
         }
         Insert: {
           created_at?: string
-          email_cadence?: string
           id?: string
           include_recording?: boolean
           include_transcript?: boolean
           only_if_call?: boolean
+          per_call_email_enabled?: boolean
           send_time_local?: string
           timezone?: string
           to_emails?: Json | null
           updated_at?: string
           user_id: string
+          weekly_email_enabled?: boolean
           weekly_day_of_week?: number | null
         }
         Update: {
           created_at?: string
-          email_cadence?: string
           id?: string
           include_recording?: boolean
           include_transcript?: boolean
           only_if_call?: boolean
+          per_call_email_enabled?: boolean
           send_time_local?: string
           timezone?: string
           to_emails?: Json | null
           updated_at?: string
           user_id?: string
+          weekly_email_enabled?: boolean
           weekly_day_of_week?: number | null
         }
         Relationships: [

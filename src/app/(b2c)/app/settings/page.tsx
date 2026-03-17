@@ -14,7 +14,8 @@ interface ProfileForm {
 }
 
 interface EmailPreferences {
-  email_cadence: 'off' | 'per_call' | 'daily' | 'weekly'
+  per_call_email_enabled: boolean
+  weekly_email_enabled: boolean
   only_if_call: boolean
   send_time_local: string
   timezone: string
@@ -31,7 +32,8 @@ const emptyProfile: ProfileForm = {
 }
 
 const defaultEmailPrefs: EmailPreferences = {
-  email_cadence: 'per_call',
+  per_call_email_enabled: true,
+  weekly_email_enabled: false,
   only_if_call: true,
   send_time_local: '18:00',
   timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -119,18 +121,20 @@ export default function B2CSettingsPage() {
         }
 
         if (prefsData) {
-          // If daily digest is set, reset to default (per_call) since it's not available yet
-          const cadence = prefsData.email_cadence === 'daily' ? defaultEmailPrefs.email_cadence : (prefsData.email_cadence ?? defaultEmailPrefs.email_cadence)
-          
+          const toEmails = Array.isArray(prefsData.to_emails)
+            ? prefsData.to_emails.filter((email): email is string => typeof email === 'string')
+            : (typeof prefsData.to_emails === 'string' ? [prefsData.to_emails] : defaultEmailPrefs.to_emails)
+
           setEmailPrefs({
-            email_cadence: cadence,
+            per_call_email_enabled: prefsData.per_call_email_enabled ?? defaultEmailPrefs.per_call_email_enabled,
+            weekly_email_enabled: prefsData.weekly_email_enabled ?? defaultEmailPrefs.weekly_email_enabled,
             only_if_call: prefsData.only_if_call ?? defaultEmailPrefs.only_if_call,
             send_time_local: prefsData.send_time_local ? prefsData.send_time_local.substring(0, 5) : defaultEmailPrefs.send_time_local,
             timezone: prefsData.timezone ?? defaultEmailPrefs.timezone,
             weekly_day_of_week: prefsData.weekly_day_of_week ?? defaultEmailPrefs.weekly_day_of_week,
             include_transcript: prefsData.include_transcript ?? defaultEmailPrefs.include_transcript,
             include_recording: prefsData.include_recording ?? defaultEmailPrefs.include_recording,
-            to_emails: Array.isArray(prefsData.to_emails) ? prefsData.to_emails : (prefsData.to_emails ? [prefsData.to_emails] : defaultEmailPrefs.to_emails),
+            to_emails: toEmails,
           })
         } else {
           // Ensure default is set even if no prefsData exists
@@ -204,12 +208,6 @@ export default function B2CSettingsPage() {
     event.preventDefault()
     if (!user) return
 
-    // Prevent saving if daily digest is selected (coming soon)
-    if (emailPrefs.email_cadence === 'daily') {
-      setEmailPrefsMessage('Daily digest is not available yet. Please select another option.')
-      return
-    }
-
     setSavingEmailPrefs(true)
     setEmailPrefsMessage(null)
 
@@ -224,22 +222,25 @@ export default function B2CSettingsPage() {
       if (userError || !userData) throw userError || new Error('User not found')
 
       // Convert time to proper format (HH:MM:SS)
-      const sendTime = emailPrefs.send_time_local.includes(':') 
-        ? `${emailPrefs.send_time_local}:00` 
-        : `${emailPrefs.send_time_local}:00:00`
+      const sendTime = emailPrefs.send_time_local.length === 5
+        ? `${emailPrefs.send_time_local}:00`
+        : emailPrefs.send_time_local
 
       const { error } = await supabase
         .from('user_notification_prefs')
         .upsert({
           user_id: userData.id,
-          email_cadence: emailPrefs.email_cadence,
+          per_call_email_enabled: emailPrefs.per_call_email_enabled,
+          weekly_email_enabled: emailPrefs.weekly_email_enabled,
           only_if_call: emailPrefs.only_if_call,
           send_time_local: sendTime,
           timezone: emailPrefs.timezone,
-          weekly_day_of_week: emailPrefs.email_cadence === 'weekly' ? emailPrefs.weekly_day_of_week : null,
+          weekly_day_of_week: emailPrefs.weekly_email_enabled
+            ? (emailPrefs.weekly_day_of_week ?? defaultEmailPrefs.weekly_day_of_week)
+            : null,
           include_transcript: emailPrefs.include_transcript,
           include_recording: emailPrefs.include_recording,
-          to_emails: emailPrefs.to_emails || [],
+          to_emails: emailPrefs.to_emails.length > 0 ? emailPrefs.to_emails : null,
         }, {
           onConflict: 'user_id'
         })
@@ -527,24 +528,29 @@ export default function B2CSettingsPage() {
                 </div>
               </label>
 
-              <label className="flex flex-col gap-1 text-sm text-slate-600">
-                Email Frequency
-                <select
-                  value={emailPrefs.email_cadence}
-                  onChange={handleEmailPrefsChange('email_cadence')}
-                  className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
-                >
-                  <option value="off">Off</option>
-                  <option value="per_call">After every call</option>
-                  <option value="daily" disabled>Daily digest (Coming soon)</option>
-                  <option value="weekly">Weekly digest</option>
-                </select>
-                {emailPrefs.email_cadence === 'daily' && (
-                  <p className="text-xs text-slate-500 mt-1">Daily digest is coming soon. Please select another option.</p>
-                )}
-              </label>
+              <div className="space-y-3">
+                <p className="text-sm text-slate-600">Email Delivery</p>
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="text-sm text-slate-700">Per-call emails</span>
+                  <input
+                    type="checkbox"
+                    checked={emailPrefs.per_call_email_enabled}
+                    onChange={handleEmailPrefsChange('per_call_email_enabled')}
+                    className="rounded border-slate-300 text-slate-900 focus:ring-slate-200"
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2">
+                  <span className="text-sm text-slate-700">Weekly digest emails</span>
+                  <input
+                    type="checkbox"
+                    checked={emailPrefs.weekly_email_enabled}
+                    onChange={handleEmailPrefsChange('weekly_email_enabled')}
+                    className="rounded border-slate-300 text-slate-900 focus:ring-slate-200"
+                  />
+                </label>
+              </div>
 
-              {emailPrefs.email_cadence !== 'off' && emailPrefs.email_cadence !== 'per_call' && (
+              {emailPrefs.weekly_email_enabled && (
                 <>
                   <label className="flex items-center gap-2 text-sm text-slate-600">
                     <input
@@ -578,29 +584,27 @@ export default function B2CSettingsPage() {
                       ))}
                     </select>
                   </label>
+
+                  <label className="flex flex-col gap-1 text-sm text-slate-600">
+                    Day of Week
+                    <select
+                      value={emailPrefs.weekly_day_of_week ?? 0}
+                      onChange={(e) => setEmailPrefs(prev => ({ ...prev, weekly_day_of_week: Number.parseInt(e.target.value, 10) }))}
+                      className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
+                    >
+                      <option value={0}>Sunday</option>
+                      <option value={1}>Monday</option>
+                      <option value={2}>Tuesday</option>
+                      <option value={3}>Wednesday</option>
+                      <option value={4}>Thursday</option>
+                      <option value={5}>Friday</option>
+                      <option value={6}>Saturday</option>
+                    </select>
+                  </label>
                 </>
               )}
 
-              {emailPrefs.email_cadence === 'weekly' && (
-                <label className="flex flex-col gap-1 text-sm text-slate-600">
-                  Day of Week
-                  <select
-                    value={emailPrefs.weekly_day_of_week ?? 0}
-                    onChange={(e) => setEmailPrefs(prev => ({ ...prev, weekly_day_of_week: parseInt(e.target.value) }))}
-                    className="rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:bg-slate-100"
-                  >
-                    <option value={0}>Sunday</option>
-                    <option value={1}>Monday</option>
-                    <option value={2}>Tuesday</option>
-                    <option value={3}>Wednesday</option>
-                    <option value={4}>Thursday</option>
-                    <option value={5}>Friday</option>
-                    <option value={6}>Saturday</option>
-                  </select>
-                </label>
-              )}
-
-              {emailPrefs.email_cadence === 'per_call' && (
+              {emailPrefs.per_call_email_enabled && (
                 <>
                   <label className="flex items-center gap-2 text-sm text-slate-600">
                     <input
