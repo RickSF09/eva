@@ -122,7 +122,7 @@ export default function B2CSettingsPage() {
 
         if (prefsData) {
           const toEmails = Array.isArray(prefsData.to_emails)
-            ? prefsData.to_emails.filter((email): email is string => typeof email === 'string')
+            ? prefsData.to_emails.filter((email: unknown): email is string => typeof email === 'string')
             : (typeof prefsData.to_emails === 'string' ? [prefsData.to_emails] : defaultEmailPrefs.to_emails)
 
           setEmailPrefs({
