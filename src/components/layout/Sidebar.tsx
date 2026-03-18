@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { useOrganizations } from '@/hooks/useOrganizations'
+import { EVA_CARES_LOGOS } from '@/config/branding'
 import { cn } from '@/lib/utils'
 
 const navigation = [
@@ -37,12 +38,13 @@ export function Sidebar() {
     <div className="flex flex-col w-64 bg-white border-r border-gray-200 h-screen">
       {/* Logo */}
       <div className="flex items-center px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">E</span>
-          </div>
-          <span className="ml-3 text-xl font-semibold text-gray-900">Eva Cares</span>
-        </div>
+        <Link href="/b2b/dashboard" aria-label="Eva Cares dashboard" className="inline-flex items-center">
+          <img
+            src={EVA_CARES_LOGOS.horizontalGradient}
+            alt="Eva Cares"
+            className="h-8 w-auto"
+          />
+        </Link>
       </div>
 
       {/* Organization Selector */}
@@ -130,4 +132,3 @@ export function Sidebar() {
     </div>
   )
 }
-

@@ -8,9 +8,9 @@ import {
   User,
   Settings,
   LogOut,
-  Heart
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
+import { EVA_CARES_LOGOS } from '@/config/branding'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
@@ -81,12 +81,13 @@ export function B2CSidebar() {
     <div className="flex flex-col w-64 bg-white border-r border-slate-200 h-screen">
       {/* Logo */}
       <div className="flex items-center px-6 py-4 border-b border-slate-200">
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-slate-600 rounded-lg flex items-center justify-center">
-            <Heart className="w-5 h-5 text-white" />
-          </div>
-          <span className="ml-3 text-xl font-semibold text-slate-900">Eva Cares</span>
-        </div>
+        <Link href="/app/home" aria-label="Eva Cares home" className="inline-flex items-center">
+          <img
+            src={EVA_CARES_LOGOS.horizontalGradient}
+            alt="Eva Cares"
+            className="h-8 w-auto"
+          />
+        </Link>
       </div>
 
       {/* Brand Tagline */}

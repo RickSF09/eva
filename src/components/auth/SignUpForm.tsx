@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { EVA_CARES_LOGOS } from '@/config/branding'
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Link from 'next/link'
 
@@ -123,6 +124,11 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
     <div className="w-full max-w-md mx-auto">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="text-center mb-6">
+          <img
+            src={EVA_CARES_LOGOS.horizontalGradient}
+            alt="Eva Cares"
+            className="mx-auto mb-4 h-9 w-auto"
+          />
           <h1 className="text-xl font-semibold text-gray-900">
             Create your account
           </h1>
