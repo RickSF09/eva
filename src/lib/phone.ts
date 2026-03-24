@@ -2,7 +2,7 @@
 
 export type SupportedCountryCode = '+1' | '+31' | '+44'
 
-export const DEFAULT_COUNTRY_CODE: SupportedCountryCode = '+1'
+export const DEFAULT_COUNTRY_CODE: SupportedCountryCode = '+44'
 
 export function detectCountryCodeFromE164(
   value: string | null | undefined,

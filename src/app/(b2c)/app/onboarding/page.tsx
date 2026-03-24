@@ -510,7 +510,7 @@ function ElderStep({
       setPhoneError(null)
     } else {
       setForm(EMPTY_ELDER_FORM)
-      setCountryCode('+1')
+      setCountryCode('+44')
     }
   }, [existing?.id])
 
@@ -669,7 +669,7 @@ function ElderStep({
                   setForm((prev) => ({ ...prev, address: event.target.value }))
                   setFeedback(null)
                 }}
-                placeholder="e.g. Austin, TX"
+                placeholder="e.g. 12 Baker Street, London, NW1 6XE"
                 className="w-full border-0 py-2 text-slate-900 focus:outline-none"
               />
             </div>
@@ -1233,7 +1233,7 @@ function ContactStep({
       setPhoneError(null)
     } else {
       setForm(DEFAULT_CONTACT_FORM)
-      setCountryCode('+1')
+      setCountryCode('+44')
     }
     setMessage(null)
   }, [existing?.id])
