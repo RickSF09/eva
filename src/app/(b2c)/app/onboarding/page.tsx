@@ -1730,17 +1730,41 @@ function ConsentActivationStep({
               </div>
             )}
 
-            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4">
-              <p className="text-sm font-semibold text-blue-900">What happens next</p>
-              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
-                <li>EvaCares staff completes a recorded consent call with your family member.</li>
-                <li>We save the outcome and recording evidence securely.</li>
-                <li>As soon as consent is marked as granted, regular calls are scheduled automatically.</li>
-              </ol>
-              <p className="mt-2 text-xs text-blue-800">
-                We currently only support direct consent from the person receiving the calls.
-              </p>
-            </div>
+            {consentStatus === 'refused' ? (
+              <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-4">
+                <p className="text-sm font-semibold text-red-900">What to do next</p>
+                <p className="mt-2 text-sm text-red-900">
+                  No worries — this happens sometimes. Here are your options:
+                </p>
+                <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm text-red-900">
+                  <li>
+                    <span className="font-medium">Want to retry at a better time?</span> Email us and we&apos;ll schedule a new consent call when your family member is ready.
+                  </li>
+                  <li>
+                    <span className="font-medium">Reply to the notification email</span> you received about this — or reach us directly at{' '}
+                    <a href="mailto:rick@evacares.co.uk" className="underline">rick@evacares.co.uk</a>. Please use the same email address you signed up with so we can locate your account quickly.
+                  </li>
+                  <li>
+                    <span className="font-medium">Want to understand why consent was refused?</span> We&apos;re happy to explain the reason. Just drop us an email and we&apos;ll get back to you.
+                  </li>
+                </ol>
+                <p className="mt-3 text-xs text-red-800">
+                  Regular calls will not start until consent is granted. Your subscription will not be charged for call minutes in the meantime.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4">
+                <p className="text-sm font-semibold text-blue-900">What happens next</p>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
+                  <li>EvaCares staff completes a recorded consent call with your family member.</li>
+                  <li>We save the outcome and recording evidence securely.</li>
+                  <li>As soon as consent is marked as granted, regular calls are scheduled automatically.</li>
+                </ol>
+                <p className="mt-2 text-xs text-blue-800">
+                  We currently only support direct consent from the person receiving the calls.
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-wrap items-center gap-2">
               <button
