@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, AlertCircle, Clock, Calendar, Edit2, X, Trash2, Phone, User, GripVertical } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ChevronDown, Clock, Calendar, Edit2, X, Trash2, Phone, User, GripVertical } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { EmergencyContactForm } from '@/components/emergency/EmergencyContactForm'
@@ -166,6 +166,7 @@ export default function B2CElderPage() {
   const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null)
   const [showScheduleForm, setShowScheduleForm] = useState(false)
   const [deletingScheduleId, setDeletingScheduleId] = useState<string | null>(null)
+  const [checklistOpen, setChecklistOpen] = useState(false)
 
   // Emergency contacts state
   const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([])
@@ -488,6 +489,7 @@ export default function B2CElderPage() {
     setScheduleSuccess(null)
     setScheduleError(null)
     setShowScheduleForm(true)
+    setChecklistOpen(false)
   }
 
   const handleCancelEdit = () => {
@@ -496,6 +498,7 @@ export default function B2CElderPage() {
     setScheduleSuccess(null)
     setScheduleError(null)
     setShowScheduleForm(false)
+    setChecklistOpen(false)
   }
 
   const handleShowNewScheduleForm = () => {
@@ -504,6 +507,7 @@ export default function B2CElderPage() {
     setScheduleSuccess(null)
     setScheduleError(null)
     setShowScheduleForm(true)
+    setChecklistOpen(false)
   }
 
   const handleCreateSchedule = async (event: FormEvent) => {
@@ -1348,82 +1352,6 @@ export default function B2CElderPage() {
                 )}
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-medium text-slate-700">Checklist items</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Add specific items for Eva to verify during the call. She'll ask about each one and track completion in the call report.
-                  </p>
-                </div>
-
-                {/* Current checklist items */}
-                <div className="space-y-2">
-                  {scheduleForm.topics.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-center text-sm text-slate-500">
-                      No items added yet. Add a custom item below or use the quick-add options.
-                    </div>
-                  ) : (
-                    scheduleForm.topics.map((topic, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={topic}
-                          onChange={(event) => updateScheduleTopic(index, event.target.value)}
-                          placeholder="e.g. Taken medication"
-                          className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeScheduleTopic(index)}
-                          className="rounded-lg p-2 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition"
-                          title="Remove item"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Add custom item button */}
-                <button
-                  type="button"
-                  onClick={addScheduleTopic}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900"
-                >
-                  + Add custom item
-                </button>
-
-                {/* Quick-add suggestions */}
-                <div>
-                  <p className="text-xs font-medium text-slate-600 mb-2">Quick add:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {COMMON_CHECKLIST_ITEMS.map((item) => {
-                      const isAdded = scheduleForm.topics.some(
-                        (topic) => topic.trim().toLowerCase() === item.trim().toLowerCase()
-                      )
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => addQuickChecklistItem(item)}
-                          disabled={isAdded}
-                          className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
-                            isAdded
-                              ? 'border-emerald-300 bg-emerald-50 text-emerald-700 cursor-default'
-                              : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
-                          }`}
-                        >
-                          {isAdded && <CheckCircle2 className="h-3 w-3" />}
-                          {item}
-                          {!isAdded && <span className="text-slate-400">+</span>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <p className="text-sm font-medium text-slate-700">Retry settings</p>
                 <p className="text-xs text-slate-500">Retries if call isn't answered</p>
@@ -1479,6 +1407,87 @@ export default function B2CElderPage() {
                   className="w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                   required
                 />
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setChecklistOpen(!checklistOpen)}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">Call checkpoints</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Optional — Eva will verify each item and track completion in the call report.</p>
+                  </div>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-slate-400 transition-transform ${checklistOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {checklistOpen && (
+                  <div className="border-t border-slate-200 px-4 pb-4 pt-3 space-y-3">
+                    <div className="space-y-2">
+                      {scheduleForm.topics.length === 0 ? (
+                        <div className="rounded-lg border border-dashed border-slate-300 px-4 py-3 text-center text-sm text-slate-500">
+                          No items added yet. Add a custom item below or use the quick-add options.
+                        </div>
+                      ) : (
+                        scheduleForm.topics.map((topic, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={topic}
+                              onChange={(event) => updateScheduleTopic(index, event.target.value)}
+                              placeholder="e.g. Taken medication"
+                              className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeScheduleTopic(index)}
+                              className="rounded-lg p-2 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition"
+                              title="Remove item"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addScheduleTopic}
+                      className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                    >
+                      + Add custom item
+                    </button>
+                    <div>
+                      <p className="text-xs font-medium text-slate-600 mb-2">Quick add:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {COMMON_CHECKLIST_ITEMS.map((item) => {
+                          const isAdded = scheduleForm.topics.some(
+                            (topic) => topic.trim().toLowerCase() === item.trim().toLowerCase()
+                          )
+                          return (
+                            <button
+                              key={item}
+                              type="button"
+                              onClick={() => addQuickChecklistItem(item)}
+                              disabled={isAdded}
+                              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all ${
+                                isAdded
+                                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700 cursor-default'
+                                  : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+                              }`}
+                            >
+                              {isAdded && <CheckCircle2 className="h-3 w-3" />}
+                              {item}
+                              {!isAdded && <span className="text-slate-400">+</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2">

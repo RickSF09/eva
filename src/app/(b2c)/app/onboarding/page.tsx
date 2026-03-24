@@ -47,14 +47,6 @@ const DAY_OPTIONS = [
   { value: 6, label: 'Sat' },
 ] as const
 
-const CHECKLIST_SUGGESTIONS = [
-  'Checked medication',
-  'Feeling safe today',
-  'Had water recently',
-  'Eaten a meal',
-  'Any pain or discomfort',
-  'Spoke to family',
-] as const
 
 const SCHEDULE_TEMPLATES = [
   {
@@ -116,7 +108,7 @@ const DEFAULT_SCHEDULE_FORM: ScheduleFormState = {
   id: null,
   days: [1, 2, 3, 4, 5],
   times: ['09:00'],
-  checklist: ['Checked medication', 'Feeling safe today'],
+  checklist: [],
   description: '',
   retryAfter: 30,
   maxRetries: 2,
@@ -1098,77 +1090,6 @@ function ScheduleStep({
               + Add another time
             </button>
           )}
-        </div>
-
-        <div>
-          <p className="text-sm font-medium text-slate-700">Call checkpoints</p>
-          <p className="text-xs text-slate-500">Eva will ask about each item below and capture it in the report.</p>
-          <div className="mt-3 space-y-2">
-            {form.checklist.map((item, index) => (
-              <div key={`checklist-${index}`} className="flex items-center gap-2">
-                <input
-                  value={item}
-                  onChange={(event) => {
-                    const next = [...form.checklist]
-                    next[index] = event.target.value
-                    setForm((prev) => ({ ...prev, checklist: next }))
-                  }}
-                  className="flex-1 rounded-2xl border border-slate-200 px-3 py-2 text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  placeholder="e.g. Taken medication"
-                />
-                <button
-                  type="button"
-                  onClick={() =>
-                    setForm((prev) => ({
-                      ...prev,
-                      checklist: prev.checklist.filter((_, idx) => idx !== index),
-                    }))
-                  }
-                  className="text-xs font-medium text-slate-500 hover:text-slate-900"
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setForm((prev) => ({ ...prev, checklist: [...prev.checklist, ''] }))}
-              className="text-xs font-semibold text-blue-600"
-            >
-              + Add custom checkpoint
-            </button>
-            <span className="text-xs text-slate-500">Quick add:</span>
-            <div className="flex flex-wrap gap-2">
-              {CHECKLIST_SUGGESTIONS.map((suggestion) => {
-                const already = form.checklist.some(
-                  (entry) => entry.trim().toLowerCase() === suggestion.toLowerCase(),
-                )
-                return (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    disabled={already}
-                    onClick={() =>
-                      setForm((prev) => ({
-                        ...prev,
-                        checklist: [...prev.checklist, suggestion],
-                      }))
-                    }
-                    className={cn(
-                      'rounded-full border px-2.5 py-1 text-xs font-semibold transition',
-                      already
-                        ? 'border-blue-200 bg-blue-50 text-blue-500'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-600',
-                    )}
-                  >
-                    {suggestion}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
