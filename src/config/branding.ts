@@ -1,10 +1,10 @@
-const LOGO_BASE_URL = 'https://www.evacares.co.uk/brand/logos/SVG'
-const FAVICON_URL = 'https://www.evacares.co.uk/brand/logos/SVG/eva-cares-favicon.svg?v=1'
+const LOGO_BASE_URL = 'https://www.dailyfriend.co.uk/brand/dailyfriend/SVG'
+const FAVICON_URL = `${LOGO_BASE_URL}/dailyfriend-favicon.svg`
 
 export const EVA_CARES_LOGOS = {
-  horizontalGradient: `${LOGO_BASE_URL}/eva-cares-logo-horizontal-gradient-no-bg.svg`,
-  iconGradient: `${LOGO_BASE_URL}/eva-cares-icon-gradient.svg`,
-  iconBlack: `${LOGO_BASE_URL}/eva-cares-icon-black.svg`,
-  iconWhite: `${LOGO_BASE_URL}/eva-cares-icon-white.svg`,
+  horizontalGradient: `${LOGO_BASE_URL}/dailyfriend-logo-horizontal-gradient-transparent.svg`,
+  iconGradient: `${LOGO_BASE_URL}/dailyfriend-icon-gradient-transparent.svg`,
+  iconBlack: `${LOGO_BASE_URL}/dailyfriend-icon-black-transparent.svg`,
+  iconWhite: `${LOGO_BASE_URL}/dailyfriend-icon-white-transparent.svg`,
   favicon: FAVICON_URL,
 } as const
