@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   let query = supabaseAdmin
     .from('elders')
     .select(
-      'id, first_name, last_name, phone, consent_status, consent_decision_at, consent_obtained_at, consent_recording_storage_path, consent_recorded_by, consent_notes, user_id, updated_at',
+      'id, first_name, last_name, phone, consent_status, consent_decision_at, consent_obtained_at, consent_recording_storage_path, consent_recorded_by, consent_notes, user_id, updated_at, users:user_id(first_name, last_name)',
     )
     .order('updated_at', { ascending: false })
     .limit(limit)
@@ -64,7 +64,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load elders' }, { status: 500 })
   }
 
-  return NextResponse.json({ elders: data ?? [] })
+  const elders = (data ?? []).map((row) => {
+    const user = row.users as { first_name: string; last_name: string } | null
+    return {
+      ...row,
+      carer_first_name: user?.first_name ?? null,
+      carer_last_name: user?.last_name ?? null,
+      users: undefined,
+    }
+  })
+
+  return NextResponse.json({ elders })
 }
 
 export async function POST(request: NextRequest) {

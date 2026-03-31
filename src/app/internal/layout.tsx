@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { redirect } from 'next/navigation'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { isInternalAdminEmail } from '@/lib/internal-access'
+import { InternalShell } from '@/components/internal/internal-shell'
 
 interface InternalLayoutProps {
   children: ReactNode
@@ -27,5 +28,5 @@ export default async function InternalLayout({ children }: InternalLayoutProps) 
     redirect('/')
   }
 
-  return <>{children}</>
+  return <InternalShell>{children}</InternalShell>
 }
