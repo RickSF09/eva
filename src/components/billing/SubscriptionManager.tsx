@@ -89,7 +89,7 @@ export function SubscriptionManager() {
     if (!status) return
 
     if (status === 'success') {
-      setInfoMessage('Your subscription is active. Thank you for being part of Eva Cares!')
+      setInfoMessage('Your subscription is active. Thank you for being part of DailyFriend!')
       setErrorMessage(null)
     } else if (status === 'cancelled') {
       setInfoMessage('Checkout cancelled. You can resume the upgrade whenever you are ready.')
@@ -289,7 +289,7 @@ export function SubscriptionManager() {
         <div>
           <h2 className="text-lg font-semibold text-slate-900">Subscription</h2>
           <p className="mt-1 text-sm text-slate-600">
-            Manage your Eva Cares subscription and billing details.
+            Manage your DailyFriend subscription and billing details.
           </p>
         </div>
         <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusBadgeStyles}`}>

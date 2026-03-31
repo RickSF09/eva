@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { LoginForm } from '@/components/auth/LoginForm'
 import { SignUpForm } from '@/components/auth/SignUpForm'
-import { EVA_CARES_LOGOS } from '@/config/branding'
+import { DAILYFRIEND_LOGOS } from '@/config/branding'
 import { supabase } from '@/lib/supabase'
 
 type TotpFactor = {
@@ -63,8 +63,8 @@ function MfaChallenge({
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="text-center mb-6">
           <img
-            src={EVA_CARES_LOGOS.horizontalGradient}
-            alt="Eva Cares"
+            src={DAILYFRIEND_LOGOS.horizontalGradient}
+            alt="DailyFriend"
             className="mx-auto mb-4 h-9 w-auto"
           />
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">Enter your 6-digit code</h1>

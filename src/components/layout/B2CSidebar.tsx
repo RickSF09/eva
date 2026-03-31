@@ -10,7 +10,7 @@ import {
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '@/components/auth/AuthProvider'
-import { EVA_CARES_LOGOS } from '@/config/branding'
+import { DAILYFRIEND_LOGOS } from '@/config/branding'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 
@@ -81,10 +81,10 @@ export function B2CSidebar() {
     <div className="flex flex-col w-64 bg-white border-r border-slate-200 h-screen">
       {/* Logo */}
       <div className="flex items-center px-6 py-4 border-b border-slate-200">
-        <Link href="/app/home" aria-label="Eva Cares home" className="inline-flex items-center">
+        <Link href="/app/home" aria-label="DailyFriend home" className="inline-flex items-center">
           <img
-            src={EVA_CARES_LOGOS.horizontalGradient}
-            alt="Eva Cares"
+            src={DAILYFRIEND_LOGOS.horizontalGradient}
+            alt="DailyFriend"
             className="h-8 w-auto"
           />
         </Link>
@@ -92,7 +92,7 @@ export function B2CSidebar() {
 
       {/* Brand Tagline */}
       <div className="px-6 py-3 border-b border-slate-200">
-        <p className="text-sm text-slate-500">Peace of mind for families</p>
+        <p className="text-sm text-slate-500">Because everyone deserves a friend</p>
       </div>
 
       {/* Navigation */}

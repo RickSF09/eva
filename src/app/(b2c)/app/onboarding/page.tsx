@@ -1714,7 +1714,7 @@ function ConsentActivationStep({
                 {consentStatus === 'granted'
                   ? 'Recorded consent has been captured. Regular calls can now be scheduled.'
                   : consentStatus === 'refused'
-                    ? 'Consent was refused. EvaCares will not start regular calls.'
+                    ? 'Consent was refused. DailyFriend will not start regular calls.'
                     : 'A manual recorded consent call is required before any regular calls begin.'}
               </p>
               {elder.consent_decision_at && (
@@ -1742,7 +1742,7 @@ function ConsentActivationStep({
                   </li>
                   <li>
                     <span className="font-medium">Reply to the notification email</span> you received about this — or reach us directly at{' '}
-                    <a href="mailto:rick@evacares.co.uk" className="underline">rick@evacares.co.uk</a>. Please use the same email address you signed up with so we can locate your account quickly.
+                    <a href="mailto:Rick@dailyfriend.co.uk" className="underline">Rick@dailyfriend.co.uk</a>. Please use the same email address you signed up with so we can locate your account quickly.
                   </li>
                   <li>
                     <span className="font-medium">Want to understand why consent was refused?</span> We&apos;re happy to explain the reason. Just drop us an email and we&apos;ll get back to you.
@@ -1756,7 +1756,7 @@ function ConsentActivationStep({
               <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4">
                 <p className="text-sm font-semibold text-blue-900">What happens next</p>
                 <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-blue-900">
-                  <li>EvaCares staff completes a recorded consent call with your family member.</li>
+                  <li>DailyFriend staff completes a recorded consent call with your family member.</li>
                   <li>We save the outcome and recording evidence securely.</li>
                   <li>As soon as consent is marked as granted, regular calls are scheduled automatically.</li>
                 </ol>

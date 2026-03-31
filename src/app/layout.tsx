@@ -2,17 +2,17 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from '@/components/auth/AuthProvider'
-import { EVA_CARES_LOGOS } from '@/config/branding'
+import { DAILYFRIEND_LOGOS } from '@/config/branding'
 
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "Eva Cares - AI-Powered Client Care",
+  title: "DailyFriend - Because everyone deserves a friend",
   description: "Comprehensive AI voice assistant platform for elder care and family peace of mind",
   icons: {
-    icon: EVA_CARES_LOGOS.favicon,
-    shortcut: EVA_CARES_LOGOS.favicon,
-    apple: EVA_CARES_LOGOS.iconGradient,
+    icon: DAILYFRIEND_LOGOS.favicon,
+    shortcut: DAILYFRIEND_LOGOS.favicon,
+    apple: DAILYFRIEND_LOGOS.iconGradient,
   },
 };
 

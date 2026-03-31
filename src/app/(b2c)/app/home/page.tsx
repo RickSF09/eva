@@ -858,7 +858,7 @@ export default function B2CHomePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold text-slate-900">
-              {profile ? `Hi ${profile.first_name}!` : 'Welcome to Eva Cares'}
+              {profile ? `Hi ${profile.first_name}!` : 'Welcome to DailyFriend'}
             </h1>
             {elder ? (
               <p className="mt-1 text-sm text-slate-600">
@@ -1418,8 +1418,7 @@ export default function B2CHomePage() {
       <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900 mb-2">Need help?</h2>
         <p className="text-sm text-slate-600">
-          Reach us at <a href="mailto:support@evacares.com" className="text-slate-900 underline hover:text-slate-700">support@evacares.com</a>{' '}
-          or call +1 (555) 123-4567 for urgent assistance.
+          Reach us at <a href="mailto:Rick@dailyfriend.co.uk" className="text-slate-900 underline hover:text-slate-700">Rick@dailyfriend.co.uk</a> for assistance.
         </p>
       </section>
 

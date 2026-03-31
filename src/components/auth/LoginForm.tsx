@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { EVA_CARES_LOGOS } from '@/config/branding'
+import { DAILYFRIEND_LOGOS } from '@/config/branding'
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
 
 interface LoginFormProps {
@@ -127,15 +127,15 @@ export function LoginForm({ onToggleMode }: LoginFormProps) {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="text-center mb-8">
           <img
-            src={EVA_CARES_LOGOS.horizontalGradient}
-            alt="Eva Cares"
+            src={DAILYFRIEND_LOGOS.horizontalGradient}
+            alt="DailyFriend"
             className="mx-auto mb-4 h-9 w-auto"
           />
           <h1 className="text-2xl font-semibold text-gray-900 mb-2">
             Welcome back
           </h1>
           <p className="text-gray-600">
-            Sign in to your Eva Cares account
+            Sign in to your DailyFriend account
           </p>
         </div>
 

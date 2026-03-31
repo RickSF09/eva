@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { EVA_CARES_LOGOS } from '@/config/branding'
+import { DAILYFRIEND_LOGOS } from '@/config/branding'
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react'
 import Link from 'next/link'
 
@@ -125,8 +125,8 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
         <div className="text-center mb-6">
           <img
-            src={EVA_CARES_LOGOS.horizontalGradient}
-            alt="Eva Cares"
+            src={DAILYFRIEND_LOGOS.horizontalGradient}
+            alt="DailyFriend"
             className="mx-auto mb-4 h-9 w-auto"
           />
           <h1 className="text-xl font-semibold text-gray-900">
@@ -285,7 +285,7 @@ export function SignUpForm({ onToggleMode }: SignUpFormProps) {
                 className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
               />
               <label htmlFor="termsAccepted" className="text-sm text-gray-600 cursor-pointer select-none">
-                I agree to the EvaCares Terms of Service and Privacy Policy.
+                I agree to the DailyFriend Terms of Service and Privacy Policy.
               </label>
             </div>
           </div>
