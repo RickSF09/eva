@@ -62,17 +62,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // We use a 60-day Stripe trial as a safety-net ceiling so that checkout
-    // shows "£0 due today". The actual trial is call-count based (5 calls) and
-    // billing is activated programmatically via /api/stripe/activate-billing
-    // (which calls trial_end: 'now'), long before the 60-day ceiling.
-    const STRIPE_TRIAL_CEILING_DAYS = 60
+    // Use trial_end (timestamp) rather than trial_period_days so that Stripe
+    // shows a specific end date rather than "60-day free trial" in big letters.
+    // Billing is activated programmatically (trial_end: 'now') after 5 trial
+    // calls + 3-day grace period — long before this ceiling expires.
+    const trialEndTimestamp = Math.floor(Date.now() / 1000) + 60 * 24 * 60 * 60 // 60 days
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
       allow_promotion_codes: true,
+      locale: 'en-GB',
+      // Disable adaptive pricing so Stripe stays in GBP rather than
+      // auto-converting to the visitor's local currency (e.g. EUR).
+      adaptive_pricing: { enabled: false },
       line_items: [
         {
           price: priceId,
@@ -81,8 +85,13 @@ export async function POST(req: NextRequest) {
       ],
       success_url: `${getAppUrl()}${successPath}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getAppUrl()}${canceledPath}`,
+      custom_text: {
+        after_submit: {
+          message: 'Your first 5 calls are completely free. Billing only begins after your trial calls are complete and a short review period.',
+        },
+      },
       subscription_data: {
-        trial_period_days: STRIPE_TRIAL_CEILING_DAYS,
+        trial_end: trialEndTimestamp,
         metadata: {
           supabase_user_id: profile.id,
         },
@@ -91,7 +100,7 @@ export async function POST(req: NextRequest) {
         supabase_user_id: profile.id,
         auth_user_id: user.id,
       },
-    })
+    } as any)
 
     return NextResponse.json({ sessionId: session.id, url: session.url })
   } catch (error) {

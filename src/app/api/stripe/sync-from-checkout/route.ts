@@ -5,7 +5,13 @@ import { mapStripeSubscriptionToUserFields } from '@/lib/stripe-subscription'
 
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId } = await req.json()
+    let body: { sessionId?: string } = {}
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'Missing or invalid request body' }, { status: 400 })
+    }
+    const { sessionId } = body
 
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json({ error: 'Missing Stripe Checkout session ID' }, { status: 400 })
