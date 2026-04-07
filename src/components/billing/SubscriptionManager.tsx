@@ -101,16 +101,20 @@ export function SubscriptionManager() {
   }, [fetchSubscription, user])
 
   // ---- Post-checkout sync -------------------------------------------------
+  // NOTE: no AbortController here — the backend is idempotent and we must not
+  // cancel an in-flight write when React Strict Mode re-runs the effect.
+  // `syncing` is intentionally excluded from deps to avoid re-triggering on
+  // the state flip that would abort the request mid-flight.
   useEffect(() => {
     const status = searchParams.get('billing')
     const sessionId = searchParams.get('session_id')
 
-    if (!user || status !== 'success' || !sessionId || syncing) return
+    if (!user || status !== 'success' || !sessionId) return
     if (lastSyncedSessionIdRef.current === sessionId) return
 
+    // Mark immediately so Strict Mode's second invocation skips the call.
     lastSyncedSessionIdRef.current = sessionId
 
-    const controller = new AbortController()
     const sync = async () => {
       setSyncing(true)
       try {
@@ -118,7 +122,6 @@ export function SubscriptionManager() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId }),
-          signal: controller.signal,
         })
 
         if (!response.ok) {
@@ -130,10 +133,8 @@ export function SubscriptionManager() {
           return
         }
 
-        await fetchSubscription()
-        refreshUsage()
+        window.location.replace('/app/settings')
       } catch (err) {
-        if (controller.signal.aborted) return
         console.error('Failed to sync after checkout', err)
         setErrorMessage('Could not confirm your subscription. Please refresh or contact support.')
         lastSyncedSessionIdRef.current = null
@@ -143,8 +144,8 @@ export function SubscriptionManager() {
     }
 
     sync()
-    return () => controller.abort()
-  }, [fetchSubscription, refreshUsage, searchParams, syncing, user])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchSubscription, refreshUsage, searchParams, user])
 
   // ---- Derived values -----------------------------------------------------
   const currentPlan = getPlanBySlug(v2.subscription?.outbound_plan_slug ?? null)

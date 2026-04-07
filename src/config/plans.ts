@@ -13,7 +13,7 @@ export const TRIAL_CALLS_REQUIRED = 5
 export const TRIAL_MINUTES_CEILING = 90
 
 /** Number of days the post-trial grace period lasts. */
-export const GRACE_PERIOD_DAYS = 3
+export const GRACE_PERIOD_DAYS = 14
 
 // -- Legacy exports (kept for backend compatibility) -----------------
 /** @deprecated Use TRIAL_CALLS_REQUIRED instead. */

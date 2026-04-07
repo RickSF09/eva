@@ -22,7 +22,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { calculateNextScheduledTime, cn } from '@/lib/utils'
 import { PricingCards } from '@/components/billing/PricingCards'
-import { TRIAL_CALLS_REQUIRED, TRIAL_MINUTES_CEILING, getPlanBySlug, formatPrice } from '@/config/plans'
+import { TRIAL_CALLS_REQUIRED, TRIAL_MINUTES_CEILING, GRACE_PERIOD_DAYS, getPlanBySlug, formatPrice } from '@/config/plans'
 import {
   type OnboardingStepId,
   useB2COnboardingSnapshot,
@@ -1516,7 +1516,7 @@ function BillingStep({
 
   useEffect(() => {
     if (billingParam === 'success') {
-      setMessage({ type: 'success', text: 'Card added. Your free trial is active!' })
+      setMessage({ type: 'success', text: `Card saved. Your first ${TRIAL_CALLS_REQUIRED} calls are free — billing starts after your trial or after ${GRACE_PERIOD_DAYS} days. We'll email you before anything is charged.` })
     } else if (billingParam === 'cancelled') {
       setMessage({ type: 'error', text: 'Checkout cancelled. You can pick a plan anytime.' })
     } else if (billingParam === 'required') {
@@ -1602,10 +1602,33 @@ function BillingStep({
 
         {/* Pricing cards for users without a subscription */}
         {!hasActiveSubscription && (
-          <div className="mt-2">
-            <p className="mb-4 text-center text-xs text-slate-500">
-              Your first {TRIAL_CALLS_REQUIRED} calls are free. You won&apos;t be charged until your trial ends. Cancel anytime.
-            </p>
+          <div className="mt-2 space-y-4">
+            {/* Why we ask for card details */}
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 text-sm text-blue-900">
+              <p className="mb-2 font-semibold">Why we ask for your payment details</p>
+              <p className="mb-3 text-blue-800">
+                We ask for your card upfront to keep the service spam-free — you won&apos;t be
+                charged anything today.
+              </p>
+              <ul className="space-y-1.5 text-blue-800">
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-500">✓</span>
+                  Your first {TRIAL_CALLS_REQUIRED} calls are completely free
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-500">✓</span>
+                  Billing starts after your {TRIAL_CALLS_REQUIRED}th call or after {GRACE_PERIOD_DAYS} days — whichever comes first
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-500">✓</span>
+                  We&apos;ll email you before any charge is taken
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="mt-0.5 text-blue-500">✓</span>
+                  Cancel or switch plans anytime — no hidden fees, no surprise charges
+                </li>
+              </ul>
+            </div>
             <PricingCards compact />
           </div>
         )}

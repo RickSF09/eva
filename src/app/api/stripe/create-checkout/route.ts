@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { stripe } from '@/lib/stripe-server'
+import { getPlanByPriceId } from '@/config/plans'
 
 const successPath = '/app/settings?billing=success'
 const canceledPath = '/app/settings?billing=cancelled'
@@ -30,9 +31,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing Stripe price ID' }, { status: 400 })
     }
 
+    const plan = getPlanByPriceId(priceId)
+    if (!plan) {
+      return NextResponse.json({ error: 'Invalid price ID. Please contact support.' }, { status: 400 })
+    }
+
     const { data: profile, error: profileError } = await supabase
       .from('users')
-      .select('id, stripe_customer_id, stripe_subscription_id')
+      .select('id, stripe_customer_id')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -62,43 +68,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Use trial_end (timestamp) rather than trial_period_days so that Stripe
-    // shows a specific end date rather than "60-day free trial" in big letters.
-    // Billing is activated programmatically (trial_end: 'now') after 5 trial
-    // calls + 3-day grace period — long before this ceiling expires.
-    const trialEndTimestamp = Math.floor(Date.now() / 1000) + 60 * 24 * 60 * 60 // 60 days
-
+    // Use setup mode — collect card details with £0 shown, no trial duration displayed.
+    // A Stripe subscription is created programmatically in /api/stripe/activate-billing
+    // once the 5 trial calls + 3-day grace period are complete.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      allow_promotion_codes: true,
+      mode: 'setup',
+      currency: 'gbp',
       locale: 'en-GB',
-      // Disable adaptive pricing so Stripe stays in GBP rather than
-      // auto-converting to the visitor's local currency (e.g. EUR).
-      adaptive_pricing: { enabled: false },
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      success_url: `${getAppUrl()}${successPath}&session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${getAppUrl()}${successPath}&session_id={CHECKOUT_SESSION_ID}&price_id=${priceId}`,
       cancel_url: `${getAppUrl()}${canceledPath}`,
-      custom_text: {
-        after_submit: {
-          message: 'Your first 5 calls are completely free. Billing only begins after your trial calls are complete and a short review period.',
-        },
-      },
-      subscription_data: {
-        trial_end: trialEndTimestamp,
-        metadata: {
-          supabase_user_id: profile.id,
-        },
-      },
       metadata: {
         supabase_user_id: profile.id,
         auth_user_id: user.id,
+        price_id: priceId,
+        plan_slug: plan.slug,
       },
     } as any)
 
@@ -108,24 +92,13 @@ export async function POST(req: NextRequest) {
 
     let message = 'Unable to create checkout session'
     if (error instanceof Error) {
-      console.error('Full error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      })
-
       if (error.message.includes('NEXT_PUBLIC_APP_URL')) {
         message = 'Server misconfiguration: NEXT_PUBLIC_APP_URL is not set'
       } else if (error.message.includes('STRIPE_SECRET_KEY')) {
         message = 'Server misconfiguration: Stripe is not configured'
-      } else if (error.message.includes('No such price')) {
-        message = 'Invalid price ID. Please contact support.'
       }
     }
 
-    return NextResponse.json(
-      { error: message },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

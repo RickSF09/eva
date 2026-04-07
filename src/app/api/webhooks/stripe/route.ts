@@ -40,10 +40,15 @@ async function syncLegacyUserFields(subscription: Stripe.Subscription) {
 }
 
 /**
- * Handle new subscription: create billing_subscriptions row, pause for trial.
+ * Handle new subscription: link stripe_subscription_id to the billing_subscriptions row.
+ *
+ * In the setup-mode checkout flow the billing_subscriptions row is created by
+ * sync-from-checkout BEFORE activate-billing creates the Stripe subscription.
+ * When the webhook fires we just need to stamp the new subscription ID onto the
+ * existing row (and create one if for some reason it doesn't exist yet).
  */
 async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
-  // 1. Sync legacy fields
+  // 1. Sync legacy fields on users table
   await syncLegacyUserFields(subscription)
 
   const customerId = typeof subscription.customer === 'string'
@@ -62,13 +67,35 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     throw userError ?? new Error('User not found')
   }
 
-  // 3. Map subscription items
   const billingFields = mapStripeToBillingSubscription(subscription)
+
+  // 3. Check if a billing_subscriptions row already exists (setup-mode flow)
+  const { data: existingBillingSub } = await supabaseAdmin
+    .from('billing_subscriptions')
+    .select('id, billing_phase')
+    .eq('user_id', user.id)
+    .is('stripe_subscription_id', null) // not yet linked
+    .maybeSingle()
+
+  if (existingBillingSub) {
+    // Setup-mode: link the Stripe subscription ID onto the existing row
+    await supabaseAdmin
+      .from('billing_subscriptions')
+      .update({
+        stripe_subscription_id: subscription.id,
+        current_period_start: billingFields.current_period_start,
+        current_period_end: billingFields.current_period_end,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingBillingSub.id)
+    return
+  }
+
+  // 4. No existing row — legacy subscription-mode flow: create one
   const outboundPlan = getPlanByPriceId(
     subscription.items.data.find(i => getPlanByPriceId(i.price.id))?.price.id ?? null
   )
 
-  // 4. Create billing_subscriptions row
   const { data: billingSub, error: insertError } = await supabaseAdmin
     .from('billing_subscriptions')
     .insert({
@@ -92,9 +119,7 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     throw insertError
   }
 
-  // 5. Link user to the billing subscription.
-  // No need to pause — Stripe's 60-day trial ceiling already prevents charges.
-  // Billing activates when activate-billing is called (trial_end: 'now').
+  // 5. Link user to the billing subscription
   await supabaseAdmin
     .from('users')
     .update({
