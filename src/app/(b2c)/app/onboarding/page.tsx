@@ -22,7 +22,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { calculateNextScheduledTime, cn } from '@/lib/utils'
 import { PricingCards } from '@/components/billing/PricingCards'
-import { TRIAL_PERIOD_DAYS, TRIAL_MINUTES, getPlanBySlug, formatPrice } from '@/config/plans'
+import { TRIAL_CALLS_REQUIRED, TRIAL_MINUTES_CEILING, getPlanBySlug, formatPrice } from '@/config/plans'
 import {
   type OnboardingStepId,
   useB2COnboardingSnapshot,
@@ -1558,7 +1558,7 @@ function BillingStep({
     <section className="rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-sm">
       <StepHeader
         title="Start Free Trial"
-        helper={`Choose a plan to begin your ${TRIAL_PERIOD_DAYS}-day free trial with ${TRIAL_MINUTES} minutes`}
+        helper={`Choose a plan to begin your free trial — your first ${TRIAL_CALLS_REQUIRED} calls are on us`}
         completed={completed}
         icon={<CreditCard className="h-5 w-5" />}
       />
@@ -1575,7 +1575,7 @@ function BillingStep({
             </p>
             {isTrial && trialEnds && (
               <p className="text-xs text-slate-500">
-                Trial ends {trialEnds}. You have {TRIAL_MINUTES} trial minutes. We&apos;ll remind you before any charges.
+                Your first {TRIAL_CALLS_REQUIRED} calls are free (up to {TRIAL_MINUTES_CEILING} minutes total). We&apos;ll remind you before any charges.
               </p>
             )}
           </div>
@@ -1604,7 +1604,7 @@ function BillingStep({
         {!hasActiveSubscription && (
           <div className="mt-2">
             <p className="mb-4 text-center text-xs text-slate-500">
-              You won&apos;t be charged until your {TRIAL_PERIOD_DAYS}-day trial ends. Cancel anytime.
+              Your first {TRIAL_CALLS_REQUIRED} calls are free. You won&apos;t be charged until your trial ends. Cancel anytime.
             </p>
             <PricingCards compact />
           </div>

@@ -12,33 +12,88 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "12.2.3 (519615d)"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
+      billing_period_usage: {
+        Row: {
+          bucket_type: string
+          call_count: number
+          created_at: string
+          elder_id: string | null
+          id: string
+          minutes_included: number
+          minutes_used: number
+          overage_cost_pence: number
+          overage_minutes: number
+          period_end: string
+          period_start: string
+          subscription_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bucket_type: string
+          call_count?: number
+          created_at?: string
+          elder_id?: string | null
+          id?: string
+          minutes_included?: number
+          minutes_used?: number
+          overage_cost_pence?: number
+          overage_minutes?: number
+          period_end: string
+          period_start: string
+          subscription_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bucket_type?: string
+          call_count?: number
+          created_at?: string
+          elder_id?: string | null
+          id?: string
+          minutes_included?: number
+          minutes_used?: number
+          overage_cost_pence?: number
+          overage_minutes?: number
+          period_end?: string
+          period_start?: string
+          subscription_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_period_usage_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_period_usage_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "billing_subscriptions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_period_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_current_context"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "billing_period_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_records: {
         Row: {
           billing_period_end: string
@@ -115,6 +170,105 @@ export type Database = {
           },
           {
             foreignKeyName: "billing_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_subscriptions: {
+        Row: {
+          billing_activated_at: string | null
+          billing_phase: string
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          grace_period_ends_at: string | null
+          id: string
+          inbound_minutes_included: number
+          inbound_plan_slug: string | null
+          inbound_stripe_item_id: string | null
+          outbound_minutes_included: number
+          outbound_plan_slug: string
+          overage_enabled: boolean
+          overage_product_id: string | null
+          overage_spend_cap_pence: number
+          overage_stripe_item_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_calls_completed: number
+          trial_calls_required: number
+          trial_completed_at: string | null
+          trial_minutes_ceiling: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_activated_at?: string | null
+          billing_phase?: string
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          grace_period_ends_at?: string | null
+          id?: string
+          inbound_minutes_included?: number
+          inbound_plan_slug?: string | null
+          inbound_stripe_item_id?: string | null
+          outbound_minutes_included: number
+          outbound_plan_slug: string
+          overage_enabled?: boolean
+          overage_product_id?: string | null
+          overage_spend_cap_pence?: number
+          overage_stripe_item_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_calls_completed?: number
+          trial_calls_required?: number
+          trial_completed_at?: string | null
+          trial_minutes_ceiling?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_activated_at?: string | null
+          billing_phase?: string
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          grace_period_ends_at?: string | null
+          id?: string
+          inbound_minutes_included?: number
+          inbound_plan_slug?: string | null
+          inbound_stripe_item_id?: string | null
+          outbound_minutes_included?: number
+          outbound_plan_slug?: string
+          overage_enabled?: boolean
+          overage_product_id?: string | null
+          overage_spend_cap_pence?: number
+          overage_stripe_item_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_calls_completed?: number
+          trial_calls_required?: number
+          trial_completed_at?: string | null
+          trial_minutes_ceiling?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_current_context"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "billing_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -897,6 +1051,45 @@ export type Database = {
           },
         ]
       }
+      email_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          provider: string
+          provider_event_id: string | null
+          provider_message_id: string | null
+          received_at: string
+          signature_verified: boolean
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload: Json
+          provider?: string
+          provider_event_id?: string | null
+          provider_message_id?: string | null
+          received_at?: string
+          signature_verified?: boolean
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          provider?: string
+          provider_event_id?: string | null
+          provider_message_id?: string | null
+          received_at?: string
+          signature_verified?: boolean
+        }
+        Relationships: []
+      }
       emergency_contacts: {
         Row: {
           active: boolean | null
@@ -1402,8 +1595,8 @@ export type Database = {
           to_emails: Json | null
           updated_at: string
           user_id: string
-          weekly_email_enabled: boolean
           weekly_day_of_week: number | null
+          weekly_email_enabled: boolean
         }
         Insert: {
           created_at?: string
@@ -1417,8 +1610,8 @@ export type Database = {
           to_emails?: Json | null
           updated_at?: string
           user_id: string
-          weekly_email_enabled?: boolean
           weekly_day_of_week?: number | null
+          weekly_email_enabled?: boolean
         }
         Update: {
           created_at?: string
@@ -1432,8 +1625,8 @@ export type Database = {
           to_emails?: Json | null
           updated_at?: string
           user_id?: string
-          weekly_email_enabled?: boolean
           weekly_day_of_week?: number | null
+          weekly_email_enabled?: boolean
         }
         Relationships: [
           {
@@ -1507,7 +1700,9 @@ export type Database = {
       users: {
         Row: {
           account_type: string
+          active_billing_subscription_id: string | null
           auth_user_id: string | null
+          billing_phase: string | null
           call_recording_notified: boolean | null
           call_recording_notified_timestamp: string | null
           created_at: string
@@ -1531,7 +1726,9 @@ export type Database = {
         }
         Insert: {
           account_type?: string
+          active_billing_subscription_id?: string | null
           auth_user_id?: string | null
+          billing_phase?: string | null
           call_recording_notified?: boolean | null
           call_recording_notified_timestamp?: string | null
           created_at?: string
@@ -1555,7 +1752,9 @@ export type Database = {
         }
         Update: {
           account_type?: string
+          active_billing_subscription_id?: string | null
           auth_user_id?: string | null
+          billing_phase?: string | null
           call_recording_notified?: boolean | null
           call_recording_notified_timestamp?: string | null
           created_at?: string
@@ -1577,7 +1776,15 @@ export type Database = {
           subscription_status?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "users_active_billing_subscription_id_fkey"
+            columns: ["active_billing_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "billing_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       weekly_insights_cron_config: {
         Row: {
@@ -1605,6 +1812,30 @@ export type Database = {
           id?: boolean
           run_trends?: boolean
           trend_window_weeks?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      weekly_post_call_digest_cron_config: {
+        Row: {
+          auth_header: string | null
+          enabled: boolean
+          endpoint_url: string | null
+          id: boolean
+          updated_at: string
+        }
+        Insert: {
+          auth_header?: string | null
+          enabled?: boolean
+          endpoint_url?: string | null
+          id?: boolean
+          updated_at?: string
+        }
+        Update: {
+          auth_header?: string | null
+          enabled?: boolean
+          endpoint_url?: string | null
+          id?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -1756,6 +1987,10 @@ export type Database = {
         Args: { p_week_start_utc?: string }
         Returns: Json
       }
+      dispatch_weekly_post_call_digests: {
+        Args: { p_now_utc?: string }
+        Returns: Json
+      }
       get_user_organizations: {
         Args: { p_auth_user_id?: string }
         Returns: {
@@ -1776,6 +2011,7 @@ export type Database = {
         Returns: Json
       }
       run_weekly_insights_tick: { Args: never; Returns: Json }
+      run_weekly_post_call_digest_tick: { Args: never; Returns: Json }
       schedule_next_call: {
         Args: {
           p_base_time?: string
@@ -1958,9 +2194,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       call_direction: ["outbound", "inbound"],
@@ -1969,3 +2202,4 @@ export const Constants = {
     },
   },
 } as const
+

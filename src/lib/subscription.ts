@@ -1,4 +1,7 @@
+import type { BillingPhase } from '@/config/plans'
+
 const ACCESS_ELIGIBLE_STATUSES = new Set(['trialing', 'active'])
+const ACCESS_ELIGIBLE_PHASES = new Set<BillingPhase>(['trial', 'grace', 'active'])
 
 export interface AllowanceWindow {
   start: string
@@ -71,8 +74,18 @@ export function getCurrentAllowanceWindow(
 
 /**
  * Returns true when a Stripe subscription status should grant product access.
+ * Kept for backward compatibility with code that checks Stripe status directly.
  */
 export function isSubscriptionActiveForAccess(status: string | null | undefined): boolean {
   if (!status) return false
   return ACCESS_ELIGIBLE_STATUSES.has(status)
+}
+
+/**
+ * Returns true when the billing phase should grant product access.
+ * Use this for the new billing flow where billing_phase is the source of truth.
+ */
+export function isBillingPhaseActiveForAccess(phase: string | null | undefined): boolean {
+  if (!phase) return false
+  return ACCESS_ELIGIBLE_PHASES.has(phase as BillingPhase)
 }

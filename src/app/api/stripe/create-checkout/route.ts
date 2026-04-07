@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabase } from '@/lib/supabase-server'
 import { stripe } from '@/lib/stripe-server'
-import { TRIAL_PERIOD_DAYS } from '@/config/plans'
 
 const successPath = '/app/settings?billing=success'
 const canceledPath = '/app/settings?billing=cancelled'
@@ -63,12 +62,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Only apply trial if the user has never had a subscription
-    const trialDays =
-      !profile.stripe_subscription_id && TRIAL_PERIOD_DAYS > 0
-        ? TRIAL_PERIOD_DAYS
-        : undefined
-
+    // No trial_period_days — trial is call-count based, managed app-side.
+    // The webhook handler will pause billing on subscription creation.
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -83,7 +78,6 @@ export async function POST(req: NextRequest) {
       success_url: `${getAppUrl()}${successPath}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getAppUrl()}${canceledPath}`,
       subscription_data: {
-        trial_period_days: trialDays,
         metadata: {
           supabase_user_id: profile.id,
         },
