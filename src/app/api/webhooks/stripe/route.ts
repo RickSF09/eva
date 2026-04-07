@@ -92,7 +92,9 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
     throw insertError
   }
 
-  // 5. Link user to the billing subscription
+  // 5. Link user to the billing subscription.
+  // No need to pause — Stripe's 60-day trial ceiling already prevents charges.
+  // Billing activates when activate-billing is called (trial_end: 'now').
   await supabaseAdmin
     .from('users')
     .update({
@@ -100,16 +102,6 @@ async function handleSubscriptionCreated(subscription: Stripe.Subscription) {
       billing_phase: 'trial',
     })
     .eq('id', user.id)
-
-  // 6. Pause billing (no charge during trial)
-  try {
-    await stripe.subscriptions.update(subscription.id, {
-      pause_collection: { behavior: 'void' },
-    })
-  } catch (pauseError) {
-    console.error('Failed to pause subscription for trial', pauseError)
-    // Non-fatal: subscription still exists, we can retry
-  }
 }
 
 /**

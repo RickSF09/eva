@@ -62,8 +62,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // No trial_period_days — trial is call-count based, managed app-side.
-    // The webhook handler will pause billing on subscription creation.
+    // We use a 60-day Stripe trial as a safety-net ceiling so that checkout
+    // shows "£0 due today". The actual trial is call-count based (5 calls) and
+    // billing is activated programmatically via /api/stripe/activate-billing
+    // (which calls trial_end: 'now'), long before the 60-day ceiling.
+    const STRIPE_TRIAL_CEILING_DAYS = 60
+
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
@@ -78,6 +82,7 @@ export async function POST(req: NextRequest) {
       success_url: `${getAppUrl()}${successPath}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getAppUrl()}${canceledPath}`,
       subscription_data: {
+        trial_period_days: STRIPE_TRIAL_CEILING_DAYS,
         metadata: {
           supabase_user_id: profile.id,
         },

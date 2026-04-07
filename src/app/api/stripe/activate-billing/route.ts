@@ -43,14 +43,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No Stripe subscription linked' }, { status: 400 })
     }
 
-    // 1. Resume billing (remove pause)
-    await stripe.subscriptions.update(billingSub.stripe_subscription_id, {
-      pause_collection: '',
-    } as any)
-
-    // 2. Anchor billing cycle to now
+    // End the Stripe trial now — this starts real billing immediately.
+    // The 60-day trial ceiling in checkout was just to show £0 due today;
+    // we always end it programmatically here rather than letting it expire.
     const subscription = await stripe.subscriptions.update(billingSub.stripe_subscription_id, {
-      billing_cycle_anchor: 'now',
+      trial_end: 'now',
       proration_behavior: 'none',
     } as any)
 
