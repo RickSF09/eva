@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
-import { isSubscriptionActiveForAccess } from '@/lib/subscription'
+import { isSubscriptionActiveForAccess, isBillingPhaseActiveForAccess } from '@/lib/subscription'
 import type { Tables } from '@/types/database'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -87,6 +87,8 @@ export interface B2COnboardingSnapshot {
   hasSubscription: boolean
   /** True when billing status should unlock B2C app access. */
   hasActiveSubscription: boolean
+  /** App-managed billing phase: 'none' | 'trial' | 'grace' | 'active' | 'canceled'. */
+  billingPhase: string | null
 }
 
 const EMPTY_SNAPSHOT: B2COnboardingSnapshot = {
@@ -99,6 +101,7 @@ const EMPTY_SNAPSHOT: B2COnboardingSnapshot = {
   subscriptionPeriodEnd: null,
   hasSubscription: false,
   hasActiveSubscription: false,
+  billingPhase: null,
 }
 
 export interface UseB2COnboardingOptions {
@@ -140,7 +143,7 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
       const { data: profile, error: profileError } = await withTimeout(
         supabase
         .from('users')
-        .select('id, subscription_status, subscription_plan, subscription_current_period_end, stripe_subscription_id')
+        .select('id, subscription_status, subscription_plan, subscription_current_period_end, stripe_subscription_id, billing_phase')
         .eq('auth_user_id', user.id)
         .maybeSingle(),
         'B2C onboarding profile query',
@@ -269,6 +272,12 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
       }
 
       const subscriptionStatus = profile.subscription_status ?? null
+      const billingPhase = profile.billing_phase ?? null
+
+      // Use billing_phase as the primary check; fall back to Stripe status for legacy compat
+      const hasActiveBilling = billingPhase
+        ? isBillingPhaseActiveForAccess(billingPhase)
+        : isSubscriptionActiveForAccess(subscriptionStatus)
 
       setSnapshot({
         profileId: profile.id,
@@ -279,7 +288,8 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
         subscriptionPlan: profile.subscription_plan ?? null,
         subscriptionPeriodEnd: profile.subscription_current_period_end ?? null,
         hasSubscription: Boolean(profile.stripe_subscription_id),
-        hasActiveSubscription: isSubscriptionActiveForAccess(subscriptionStatus),
+        hasActiveSubscription: hasActiveBilling,
+        billingPhase,
       })
     } catch (err) {
       console.error('Failed to load onboarding snapshot', err)

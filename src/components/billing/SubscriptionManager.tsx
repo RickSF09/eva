@@ -1,77 +1,46 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { format, differenceInDays } from 'date-fns'
+import { format } from 'date-fns'
 import { useSearchParams } from 'next/navigation'
 import { useAuth } from '@/components/auth/AuthProvider'
 import { supabase } from '@/lib/supabase'
 import { PricingCards } from '@/components/billing/PricingCards'
+import { TrialProgress } from '@/components/billing/TrialProgress'
+import { GracePeriodBanner } from '@/components/billing/GracePeriodBanner'
+import { UsageDashboard } from '@/components/billing/UsageDashboard'
+import { InboundAddonSelector } from '@/components/billing/InboundAddonSelector'
+import { OverageSettings } from '@/components/billing/OverageSettings'
 import { useCallUsage } from '@/hooks/useCallUsage'
-import {
-  getPlanBySlug,
-  formatPrice,
-  getMinutesForPlan,
-  TRIAL_PERIOD_DAYS,
-  TRIAL_MINUTES,
-} from '@/config/plans'
+import { getPlanBySlug, formatPrice } from '@/config/plans'
+import type { BillingPhase } from '@/config/plans'
 
-type SubscriptionStatus =
-  | 'trialing'
-  | 'active'
-  | 'past_due'
-  | 'canceled'
-  | 'unpaid'
-  | 'incomplete'
-  | 'incomplete_expired'
-  | 'paused'
-  | 'processing'
-  | 'unknown'
-
-interface SubscriptionDetails {
-  status: SubscriptionStatus
-  plan: string | null
-  currentPeriodEnd: string | null
-  cancelAtPeriodEnd: boolean
-  hasSubscription: boolean
+function formatPhaseLabel(phase: BillingPhase): string {
+  switch (phase) {
+    case 'trial': return 'Free trial'
+    case 'grace': return 'Grace period'
+    case 'active': return 'Active'
+    case 'canceled': return 'Canceled'
+    default: return 'Not subscribed'
+  }
 }
 
-const defaultSubscription: SubscriptionDetails = {
-  status: 'unknown',
-  plan: null,
-  currentPeriodEnd: null,
-  cancelAtPeriodEnd: false,
-  hasSubscription: false,
-}
-
-function formatStatus(status: SubscriptionStatus) {
-  switch (status) {
-    case 'trialing':
-      return 'Free trial'
-    case 'active':
-      return 'Active'
-    case 'past_due':
-      return 'Past due'
-    case 'canceled':
-      return 'Canceled'
-    case 'unpaid':
-      return 'Unpaid'
-    case 'incomplete':
-      return 'Incomplete'
-    case 'incomplete_expired':
-      return 'Incomplete (Expired)'
-    case 'paused':
-      return 'Paused'
-    case 'processing':
-      return 'Processing'
-    default:
-      return 'Not subscribed'
+function phaseBadgeStyles(phase: BillingPhase): string {
+  switch (phase) {
+    case 'active': return 'bg-green-100 text-green-800 border-green-200'
+    case 'trial': return 'bg-blue-100 text-blue-800 border-blue-200'
+    case 'grace': return 'bg-amber-100 text-amber-800 border-amber-200'
+    case 'canceled': return 'bg-slate-100 text-slate-700 border-slate-200'
+    default: return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 }
 
 export function SubscriptionManager() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [subscription, setSubscription] = useState<SubscriptionDetails>(defaultSubscription)
+  const [billingPhase, setBillingPhase] = useState<BillingPhase>('none')
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -79,13 +48,11 @@ export function SubscriptionManager() {
   const searchParams = useSearchParams()
   const lastSyncedSessionIdRef = useRef<string | null>(null)
 
-  // Call usage tracking
-  const { usage, loading: usageLoading, refresh: refreshUsage } = useCallUsage()
+  const { v2, loading: usageLoading, refresh: refreshUsage } = useCallUsage()
 
   // ---- URL param messages -------------------------------------------------
   useEffect(() => {
     const status = searchParams.get('billing')
-
     if (!status) return
 
     if (status === 'success') {
@@ -98,7 +65,7 @@ export function SubscriptionManager() {
     }
   }, [searchParams])
 
-  // ---- Fetch subscription --------------------------------------------------
+  // ---- Fetch subscription state -------------------------------------------
   const fetchSubscription = useCallback(async () => {
     if (!user) return
 
@@ -108,27 +75,18 @@ export function SubscriptionManager() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select(
-          'subscription_status, subscription_plan, subscription_current_period_end, subscription_cancel_at_period_end, stripe_subscription_id'
-        )
+        .select('billing_phase, stripe_subscription_id, subscription_cancel_at_period_end')
         .eq('auth_user_id', user.id)
         .single()
 
-      if (error || !data) {
-        throw error ?? new Error('User not found')
-      }
+      if (error || !data) throw error ?? new Error('User not found')
 
-      setSubscription({
-        status: (data.subscription_status as SubscriptionStatus) ?? 'unknown',
-        plan: data.subscription_plan,
-        currentPeriodEnd: data.subscription_current_period_end,
-        cancelAtPeriodEnd: data.subscription_cancel_at_period_end ?? false,
-        hasSubscription: Boolean(data.stripe_subscription_id),
-      })
+      setBillingPhase((data.billing_phase as BillingPhase) ?? 'none')
+      setHasSubscription(Boolean(data.stripe_subscription_id))
+      setCancelAtPeriodEnd(data.subscription_cancel_at_period_end ?? false)
     } catch (err) {
       console.error('Failed to load subscription details', err)
       setErrorMessage('Unable to load subscription status. Please try again.')
-      setSubscription(defaultSubscription)
     } finally {
       setLoading(false)
     }
@@ -137,24 +95,25 @@ export function SubscriptionManager() {
   useEffect(() => {
     if (!user) {
       setLoading(false)
-      setSubscription(defaultSubscription)
       return
     }
-
     fetchSubscription()
   }, [fetchSubscription, user])
 
-  // ---- Post-checkout sync --------------------------------------------------
+  // ---- Post-checkout sync -------------------------------------------------
+  // NOTE: no AbortController here — the backend is idempotent and we must not
+  // cancel an in-flight write when React Strict Mode re-runs the effect.
+  // `syncing` is intentionally excluded from deps to avoid re-triggering on
+  // the state flip that would abort the request mid-flight.
   useEffect(() => {
     const status = searchParams.get('billing')
     const sessionId = searchParams.get('session_id')
 
-    if (!user || status !== 'success' || !sessionId || syncing) return
+    if (!user || status !== 'success' || !sessionId) return
     if (lastSyncedSessionIdRef.current === sessionId) return
 
+    // Mark immediately so Strict Mode's second invocation skips the call.
     lastSyncedSessionIdRef.current = sessionId
-
-    const controller = new AbortController()
 
     const sync = async () => {
       setSyncing(true)
@@ -163,23 +122,21 @@ export function SubscriptionManager() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId }),
-          signal: controller.signal,
         })
 
         if (!response.ok) {
           const { error } = await response.json().catch(() => ({
             error: 'Unable to sync subscription. Please try again.',
           }))
-          setErrorMessage(error ?? 'Unable to sync subscription. Please try again.')
+          setErrorMessage(error ?? 'Unable to sync subscription.')
           lastSyncedSessionIdRef.current = null
           return
         }
 
-        await fetchSubscription()
+        window.location.replace('/app/settings')
       } catch (err) {
-        if (controller.signal.aborted) return
-        console.error('Failed to sync subscription after checkout', err)
-        setErrorMessage('We could not confirm your subscription. Please refresh or contact support.')
+        console.error('Failed to sync after checkout', err)
+        setErrorMessage('Could not confirm your subscription. Please refresh or contact support.')
         lastSyncedSessionIdRef.current = null
       } finally {
         setSyncing(false)
@@ -187,53 +144,22 @@ export function SubscriptionManager() {
     }
 
     sync()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchSubscription, refreshUsage, searchParams, user])
 
-    return () => controller.abort()
-  }, [fetchSubscription, searchParams, syncing, user])
-
-  // ---- Derived values ------------------------------------------------------
-  const isTrial = subscription.status === 'trialing'
-  const currentPlan = getPlanBySlug(subscription.plan)
-  const minutesIncluded = getMinutesForPlan(subscription.plan, isTrial)
+  // ---- Derived values -----------------------------------------------------
+  const currentPlan = getPlanBySlug(v2.subscription?.outbound_plan_slug ?? null)
 
   const nextBillingDate = useMemo(() => {
-    if (!subscription.currentPeriodEnd) return null
+    if (!v2.subscription?.current_period_end) return null
     try {
-      return format(new Date(subscription.currentPeriodEnd), 'PPP')
+      return format(new Date(v2.subscription.current_period_end), 'PPP')
     } catch {
       return null
     }
-  }, [subscription.currentPeriodEnd])
+  }, [v2.subscription])
 
-  const trialDaysRemaining = useMemo(() => {
-    if (!isTrial || !subscription.currentPeriodEnd) return null
-    try {
-      const days = differenceInDays(new Date(subscription.currentPeriodEnd), new Date())
-      return Math.max(0, days)
-    } catch {
-      return null
-    }
-  }, [isTrial, subscription.currentPeriodEnd])
-
-  const statusBadgeStyles = useMemo(() => {
-    switch (subscription.status) {
-      case 'active':
-        return 'bg-green-100 text-green-800 border-green-200'
-      case 'trialing':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'past_due':
-      case 'unpaid':
-      case 'incomplete':
-      case 'incomplete_expired':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'canceled':
-        return 'bg-slate-100 text-slate-700 border-slate-200'
-      default:
-        return 'bg-slate-100 text-slate-700 border-slate-200'
-    }
-  }, [subscription.status])
-
-  // ---- Actions -------------------------------------------------------------
+  // ---- Actions ------------------------------------------------------------
   const handleManageBilling = async () => {
     setActionLoading(true)
     setErrorMessage(null)
@@ -243,27 +169,39 @@ export function SubscriptionManager() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
-
-      if (!response.ok) {
-        throw new Error('Billing portal session failed')
-      }
-
+      if (!response.ok) throw new Error('Billing portal session failed')
       const { url } = await response.json()
       window.location.href = url
     } catch (err) {
       console.error('Failed to open Stripe Billing Portal', err)
       setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : 'Unable to open the billing portal. Please try again.'
+        err instanceof Error ? err.message : 'Unable to open the billing portal. Please try again.'
       )
     } finally {
       setActionLoading(false)
     }
   }
 
-  // ---- Render: no subscription → show pricing cards ------------------------
-  if (!loading && !subscription.hasSubscription && !syncing) {
+  const handleRefresh = async () => {
+    if (hasSubscription) {
+      setSyncing(true)
+      try {
+        await fetch('/api/stripe/sync-subscription', { method: 'POST' })
+      } finally {
+        setSyncing(false)
+      }
+    }
+    await fetchSubscription()
+    refreshUsage()
+  }
+
+  const handleUpdate = () => {
+    fetchSubscription()
+    refreshUsage()
+  }
+
+  // ---- Render: no subscription → show pricing cards -----------------------
+  if (!loading && !hasSubscription && !syncing) {
     return (
       <div className="space-y-4">
         {errorMessage && (
@@ -281,7 +219,7 @@ export function SubscriptionManager() {
     )
   }
 
-  // ---- Render: has subscription → show details -----------------------------
+  // ---- Render: has subscription → show billing dashboard ------------------
   return (
     <div className="rounded-2xl border border-slate-200 bg-white px-6 py-6 shadow-sm">
       {/* Header */}
@@ -292,25 +230,19 @@ export function SubscriptionManager() {
             Manage your DailyFriend subscription and billing details.
           </p>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${statusBadgeStyles}`}>
-          {loading ? 'Loading…' : formatStatus(subscription.status)}
+        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${phaseBadgeStyles(billingPhase)}`}>
+          {loading ? 'Loading...' : formatPhaseLabel(billingPhase)}
         </span>
       </div>
 
-      <div className="mt-6 space-y-4 text-sm text-slate-700">
-        {/* Trial banner */}
-        {isTrial && trialDaysRemaining !== null && (
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
-            <p className="font-medium text-blue-800">
-              Free trial &mdash; {trialDaysRemaining} {trialDaysRemaining === 1 ? 'day' : 'days'}{' '}
-              remaining
-            </p>
-            <p className="mt-1 text-blue-700">
-              You have {TRIAL_MINUTES} trial minutes. Your{' '}
-              {currentPlan ? currentPlan.name : 'selected'} plan will start automatically when the
-              trial ends.
-            </p>
-          </div>
+      <div className="mt-6 space-y-6 text-sm text-slate-700">
+        {/* Phase-specific banners */}
+        {billingPhase === 'trial' && (
+          <TrialProgress subscription={v2.subscription} />
+        )}
+
+        {billingPhase === 'grace' && (
+          <GracePeriodBanner subscription={v2.subscription} onConfirmPlan={handleUpdate} />
         )}
 
         {/* Plan details */}
@@ -321,10 +253,8 @@ export function SubscriptionManager() {
               <p className="mt-1 font-medium text-slate-900">{currentPlan.name}</p>
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                {isTrial ? 'Trial minutes' : 'Minutes / month'}
-              </p>
-              <p className="mt-1 font-medium text-slate-900">{minutesIncluded}</p>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Outbound min / month</p>
+              <p className="mt-1 font-medium text-slate-900">{currentPlan.minutesIncluded}</p>
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-500">Price</p>
@@ -335,68 +265,35 @@ export function SubscriptionManager() {
           </div>
         )}
 
-        {/* Usage tracking */}
-        {!usageLoading && usage.minutesIncluded > 0 && (
-          <div className="rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-wide text-slate-500">
-                Minutes used this period
-              </p>
-              <p className="text-sm font-semibold text-slate-900">
-                {usage.minutesUsed} / {usage.minutesIncluded}
-              </p>
-            </div>
-            {/* Progress bar */}
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  usage.usagePercent >= 90
-                    ? 'bg-red-500'
-                    : usage.usagePercent >= 75
-                      ? 'bg-yellow-500'
-                      : 'bg-blue-500'
-                }`}
-                style={{ width: `${usage.usagePercent}%` }}
-              />
-            </div>
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
-              <span>{usage.callCount} call{usage.callCount !== 1 ? 's' : ''} this period</span>
-              <span
-                className={
-                  usage.usagePercent >= 90
-                    ? 'font-medium text-red-600'
-                    : usage.usagePercent >= 75
-                      ? 'font-medium text-yellow-600'
-                      : ''
-                }
-              >
-                {usage.minutesRemaining} minute{usage.minutesRemaining !== 1 ? 's' : ''} remaining
-              </span>
-            </div>
-            {usage.usagePercent >= 90 && (
-              <p className="mt-2 text-xs font-medium text-red-600">
-                You&apos;re running low on minutes. Consider upgrading your plan.
-              </p>
-            )}
+        {/* Usage dashboard (active phase) */}
+        {billingPhase === 'active' && !usageLoading && (
+          <UsageDashboard
+            outbound={v2.outbound}
+            inbound={v2.inbound}
+            subscription={v2.subscription}
+          />
+        )}
+
+        {/* Inbound add-on (grace or active) */}
+        {(billingPhase === 'grace' || billingPhase === 'active') && (
+          <div className="border-t border-slate-100 pt-5">
+            <InboundAddonSelector subscription={v2.subscription} onUpdate={handleUpdate} />
           </div>
         )}
 
-        {/* Fallback for unrecognised plan slug */}
-        {!currentPlan && subscription.plan && (
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-500">Plan</p>
-            <p className="mt-1 font-medium text-slate-900">
-              {subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)}
-            </p>
+        {/* Overage settings (grace or active) */}
+        {(billingPhase === 'grace' || billingPhase === 'active') && (
+          <div className="border-t border-slate-100 pt-5">
+            <OverageSettings subscription={v2.subscription} onUpdate={handleUpdate} />
           </div>
         )}
 
         {/* Next billing date */}
-        {nextBillingDate && !isTrial && (
+        {nextBillingDate && billingPhase === 'active' && (
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Next billing date</p>
             <p className="mt-1 font-medium text-slate-900">{nextBillingDate}</p>
-            {subscription.cancelAtPeriodEnd && (
+            {cancelAtPeriodEnd && (
               <p className="mt-1 text-xs text-slate-500">
                 Your subscription will end at the close of this billing period.
               </p>
@@ -419,32 +316,23 @@ export function SubscriptionManager() {
 
       {/* Actions */}
       <div className="mt-6 flex flex-wrap gap-3">
+        {billingPhase === 'active' && (
+          <button
+            type="button"
+            onClick={handleManageBilling}
+            disabled={loading || actionLoading}
+            className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Manage billing
+          </button>
+        )}
         <button
           type="button"
-          onClick={handleManageBilling}
-          disabled={loading || actionLoading || !subscription.hasSubscription}
-          className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isTrial ? 'Change plan' : 'Manage billing'}
-        </button>
-        <button
-          type="button"
-          onClick={async () => {
-            if (subscription.hasSubscription) {
-              setSyncing(true)
-              try {
-                await fetch('/api/stripe/sync-subscription', { method: 'POST' })
-              } finally {
-                setSyncing(false)
-              }
-            }
-            await fetchSubscription()
-            refreshUsage()
-          }}
+          onClick={handleRefresh}
           disabled={loading || syncing || usageLoading}
           className="inline-flex items-center rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {syncing ? 'Syncing…' : 'Refresh'}
+          {syncing ? 'Syncing...' : 'Refresh'}
         </button>
       </div>
     </div>

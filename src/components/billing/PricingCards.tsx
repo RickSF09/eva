@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Check } from 'lucide-react'
-import { PLANS, TRIAL_PERIOD_DAYS, formatPrice, type PlanDefinition } from '@/config/plans'
+import { PLANS, TRIAL_CALLS_REQUIRED, formatPrice, type PlanDefinition } from '@/config/plans'
 
 interface PricingCardsProps {
   /** Slug of the user's current plan (if any). */
@@ -13,6 +13,8 @@ interface PricingCardsProps {
   onSelectPlan?: (plan: PlanDefinition) => void
   /** Compact mode hides the header text (useful when embedded inside another component). */
   compact?: boolean
+  /** Context-aware CTA label override. */
+  ctaLabel?: string
 }
 
 export function PricingCards({
@@ -20,6 +22,7 @@ export function PricingCards({
   isTrialing,
   onSelectPlan,
   compact = false,
+  ctaLabel,
 }: PricingCardsProps) {
   const [loadingSlug, setLoadingSlug] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -74,8 +77,8 @@ export function PricingCards({
         <div className="mb-8 text-center">
           <h2 className="text-2xl font-bold text-slate-900">Choose your plan</h2>
           <p className="mt-2 text-sm text-slate-600">
-            Start with a {TRIAL_PERIOD_DAYS}-day free trial. Cancel anytime before it ends &mdash;
-            no charge.
+            Your first {TRIAL_CALLS_REQUIRED} calls are free. Cancel anytime before your trial ends
+            &mdash; no charge.
           </p>
         </div>
       )}
@@ -160,7 +163,7 @@ export function PricingCards({
                     : 'Current plan'
                   : loading
                     ? 'Redirecting…'
-                    : `Start ${TRIAL_PERIOD_DAYS}-day free trial`}
+                    : ctaLabel ?? 'Start free trial'}
               </button>
 
               {/* Fine print */}

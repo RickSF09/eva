@@ -2,27 +2,66 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '@/components/auth/AuthProvider'
-import { supabase } from '@/lib/supabase'
-import { getMinutesForPlan } from '@/config/plans'
-import { getCurrentAllowanceWindow } from '@/lib/subscription'
+import type { BillingPhase } from '@/config/plans'
+
+// -- Types ---------------------------------------------------------------
+
+export interface BucketUsage {
+  minutesUsed: number
+  minutesIncluded: number
+  minutesRemaining: number
+  usagePercent: number
+  overageMinutes: number
+  overageCostPence: number
+  callCount: number
+  periodStart: string | null
+  periodEnd: string | null
+}
+
+export interface BillingSubscriptionInfo {
+  id: string
+  outbound_plan_slug: string
+  outbound_minutes_included: number
+  inbound_plan_slug: string | null
+  inbound_minutes_included: number
+  overage_enabled: boolean
+  overage_spend_cap_pence: number
+  trial_calls_required: number
+  trial_calls_completed: number
+  trial_minutes_ceiling: number
+  grace_period_ends_at: string | null
+  billing_activated_at: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+}
+
+export interface CallUsageV2 {
+  billingPhase: BillingPhase
+  outbound: BucketUsage | null
+  inbound: BucketUsage | null
+  subscription: BillingSubscriptionInfo | null
+}
+
+// -- Legacy interface (kept for backward-compatible consumers) -----------
 
 export interface CallUsage {
-  /** Total minutes used in the current billing period (rounded up per call). */
   minutesUsed: number
-  /** Total minutes included in the plan (or trial). */
   minutesIncluded: number
-  /** Minutes remaining (never negative). */
   minutesRemaining: number
-  /** Usage as a percentage (0-100, capped at 100). */
   usagePercent: number
-  /** Whether the user is on a trial. */
   isTrial: boolean
-  /** Current allowance window start (ISO string). */
   periodStart: string | null
-  /** Current allowance window end (ISO string). */
   periodEnd: string | null
-  /** Number of calls in this period. */
   callCount: number
+}
+
+// -- Defaults ------------------------------------------------------------
+
+const DEFAULT_V2: CallUsageV2 = {
+  billingPhase: 'none',
+  outbound: null,
+  inbound: null,
+  subscription: null,
 }
 
 const DEFAULT_USAGE: CallUsage = {
@@ -36,15 +75,17 @@ const DEFAULT_USAGE: CallUsage = {
   callCount: 0,
 }
 
+// -- Hook ----------------------------------------------------------------
+
 export function useCallUsage() {
   const { user } = useAuth()
-  const [usage, setUsage] = useState<CallUsage>(DEFAULT_USAGE)
+  const [v2, setV2] = useState<CallUsageV2>(DEFAULT_V2)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchUsage = useCallback(async () => {
     if (!user) {
-      setUsage(DEFAULT_USAGE)
+      setV2(DEFAULT_V2)
       setLoading(false)
       return
     }
@@ -53,135 +94,20 @@ export function useCallUsage() {
     setError(null)
 
     try {
-      // 1. Get user's subscription info and elder ID
-      const { data: profile, error: profileError } = await supabase
-        .from('users')
-        .select(`
-          id,
-          subscription_status,
-          subscription_plan,
-          subscription_current_period_start,
-          subscription_current_period_end,
-          stripe_subscription_id
-        `)
-        .eq('auth_user_id', user.id)
-        .single()
+      const res = await fetch('/api/billing/usage')
+      if (!res.ok) throw new Error('Failed to fetch billing usage')
 
-      if (profileError || !profile) {
-        throw profileError ?? new Error('Profile not found')
-      }
-
-      // If no subscription, return defaults
-      if (!profile.stripe_subscription_id) {
-        setUsage(DEFAULT_USAGE)
-        setLoading(false)
-        return
-      }
-
-      // 2. Get the elder associated with this user
-      const { data: elder, error: elderError } = await supabase
-        .from('elders')
-        .select('id')
-        .eq('user_id', profile.id)
-        .maybeSingle()
-
-      if (elderError) {
-        throw elderError
-      }
-
-      // If no elder, can't calculate usage
-      if (!elder) {
-        const isTrial = profile.subscription_status === 'trialing'
-        const minutesIncluded = getMinutesForPlan(profile.subscription_plan, isTrial)
-        setUsage({
-          ...DEFAULT_USAGE,
-          minutesIncluded,
-          minutesRemaining: minutesIncluded,
-          isTrial,
-          periodEnd: profile.subscription_current_period_end,
-        })
-        setLoading(false)
-        return
-      }
-
-      // 3. Resolve the current allowance window from Stripe period bounds.
-      let allowanceWindow = getCurrentAllowanceWindow(
-        profile.subscription_current_period_start,
-        profile.subscription_current_period_end,
-      )
-
-      // Legacy fallback for users without the new period-start column populated yet.
-      if (!allowanceWindow && profile.subscription_current_period_end) {
-        const periodEnd = new Date(profile.subscription_current_period_end)
-        if (!Number.isNaN(periodEnd.getTime())) {
-          const fallbackStart = new Date(periodEnd)
-          fallbackStart.setUTCDate(fallbackStart.getUTCDate() - 30)
-          allowanceWindow = {
-            start: fallbackStart.toISOString(),
-            end: periodEnd.toISOString(),
-          }
-        }
-      }
-
-      if (!allowanceWindow) {
-        const isTrial = profile.subscription_status === 'trialing'
-        const minutesIncluded = getMinutesForPlan(profile.subscription_plan, isTrial)
-        setUsage({
-          ...DEFAULT_USAGE,
-          minutesIncluded,
-          minutesRemaining: minutesIncluded,
-          isTrial,
-          periodStart: null,
-          periodEnd: profile.subscription_current_period_end,
-        })
-        setLoading(false)
-        return
-      }
-
-      // 4. Query call executions for this elder in the current allowance window.
-      const { data: executions, error: execError } = await supabase
-        .from('call_executions')
-        .select('duration')
-        .eq('elder_id', elder.id)
-        .gte('completed_at', allowanceWindow.start)
-        .lt('completed_at', allowanceWindow.end)
-        .not('duration', 'is', null)
-
-      if (execError) {
-        throw execError
-      }
-
-      // 5. Calculate total minutes used (round up each call individually).
-      const minutesUsed = (executions ?? []).reduce((sum, execution) => {
-        const duration = typeof execution.duration === 'number' ? execution.duration : 0
-        if (duration <= 0) return sum
-        return sum + Math.ceil(duration / 60)
-      }, 0)
-
-      // 6. Get minutes included based on plan
-      const isTrial = profile.subscription_status === 'trialing'
-      const minutesIncluded = getMinutesForPlan(profile.subscription_plan, isTrial)
-
-      // 7. Calculate remaining and percentage
-      const minutesRemaining = Math.max(0, minutesIncluded - minutesUsed)
-      const usagePercent = minutesIncluded > 0
-        ? Math.min(100, Math.round((minutesUsed / minutesIncluded) * 100))
-        : 0
-
-      setUsage({
-        minutesUsed,
-        minutesIncluded,
-        minutesRemaining,
-        usagePercent,
-        isTrial,
-        periodStart: allowanceWindow.start,
-        periodEnd: allowanceWindow.end,
-        callCount: executions?.length ?? 0,
+      const data = await res.json()
+      setV2({
+        billingPhase: data.billing_phase ?? 'none',
+        outbound: data.outbound ?? null,
+        inbound: data.inbound ?? null,
+        subscription: data.subscription ?? null,
       })
     } catch (err) {
       console.error('Failed to fetch call usage', err)
       setError('Unable to load usage data')
-      setUsage(DEFAULT_USAGE)
+      setV2(DEFAULT_V2)
     } finally {
       setLoading(false)
     }
@@ -191,5 +117,24 @@ export function useCallUsage() {
     fetchUsage()
   }, [fetchUsage])
 
-  return { usage, loading, error, refresh: fetchUsage }
+  // Build a legacy-compatible `usage` object from the V2 data
+  const usage: CallUsage = v2.outbound
+    ? {
+        minutesUsed: v2.outbound.minutesUsed,
+        minutesIncluded: v2.outbound.minutesIncluded,
+        minutesRemaining: v2.outbound.minutesRemaining,
+        usagePercent: v2.outbound.usagePercent,
+        isTrial: v2.billingPhase === 'trial',
+        periodStart: v2.outbound.periodStart,
+        periodEnd: v2.outbound.periodEnd,
+        callCount: v2.outbound.callCount,
+      }
+    : {
+        ...DEFAULT_USAGE,
+        isTrial: v2.billingPhase === 'trial',
+        minutesIncluded: v2.subscription?.outbound_minutes_included ?? 0,
+        minutesRemaining: v2.subscription?.outbound_minutes_included ?? 0,
+      }
+
+  return { usage, v2, loading, error, refresh: fetchUsage }
 }

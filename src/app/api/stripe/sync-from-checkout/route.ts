@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe-server'
 import { createServerSupabase } from '@/lib/supabase-server'
-import { mapStripeSubscriptionToUserFields } from '@/lib/stripe-subscription'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getPlanByPriceId, TRIAL_CALLS_REQUIRED, TRIAL_MINUTES_CEILING } from '@/config/plans'
 
 export async function POST(req: NextRequest) {
   try {
-    const { sessionId } = await req.json()
+    let body: { sessionId?: string } = {}
+    try {
+      body = await req.json()
+    } catch {
+      return NextResponse.json({ error: 'Missing or invalid request body' }, { status: 400 })
+    }
+    const { sessionId } = body
 
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json({ error: 'Missing Stripe Checkout session ID' }, { status: 400 })
@@ -20,7 +27,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('users')
       .select('id, stripe_customer_id')
       .eq('auth_user_id', user.id)
@@ -30,22 +37,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User profile not found' }, { status: 400 })
     }
 
+    // Retrieve the checkout session with setup_intent expanded
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['subscription'],
+      expand: ['setup_intent'],
     })
+
+    if (session.mode !== 'setup') {
+      return NextResponse.json({ error: 'Expected a setup-mode checkout session' }, { status: 400 })
+    }
 
     const sessionCustomer =
       typeof session.customer === 'string' ? session.customer : session.customer?.id
 
-    if (!session || !sessionCustomer) {
+    if (!sessionCustomer) {
       return NextResponse.json(
         { error: 'Checkout session missing customer information' },
         { status: 400 }
       )
     }
 
+    // Verify this session belongs to the current user
     if (!profile.stripe_customer_id) {
-      const { error: updateCustomerError } = await supabase
+      const { error: updateCustomerError } = await supabaseAdmin
         .from('users')
         .update({ stripe_customer_id: sessionCustomer })
         .eq('id', profile.id)
@@ -63,55 +76,112 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const subscriptionId =
-      typeof session.subscription === 'string'
-        ? session.subscription
-        : session.subscription?.id
+    // Extract the SetupIntent
+    const setupIntent =
+      typeof session.setup_intent === 'string'
+        ? await stripe.setupIntents.retrieve(session.setup_intent)
+        : (session.setup_intent as import('stripe').Stripe.SetupIntent | null)
 
-    if (!subscriptionId) {
+    if (!setupIntent || setupIntent.status !== 'succeeded') {
       return NextResponse.json(
-        { error: 'Unable to locate subscription for session' },
-        { status: 404 }
+        { error: 'Setup intent is not in a completed state' },
+        { status: 400 }
       )
     }
 
-    const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+    const paymentMethodId =
+      typeof setupIntent.payment_method === 'string'
+        ? setupIntent.payment_method
+        : setupIntent.payment_method?.id
 
-    if (!subscription) {
+    if (!paymentMethodId) {
       return NextResponse.json(
-        { error: 'Unable to retrieve subscription' },
-        { status: 404 }
+        { error: 'No payment method found on setup intent' },
+        { status: 400 }
       )
     }
 
-    const updatePayload = mapStripeSubscriptionToUserFields(subscription)
+    // Save the payment method as the customer's default
+    await stripe.customers.update(sessionCustomer, {
+      invoice_settings: { default_payment_method: paymentMethodId },
+    })
 
-    const { error: updateError } = await supabase
+    // Get price_id from session metadata (set by create-checkout)
+    const priceId = session.metadata?.price_id
+    if (!priceId) {
+      return NextResponse.json(
+        { error: 'No price_id in session metadata' },
+        { status: 400 }
+      )
+    }
+
+    const plan = getPlanByPriceId(priceId)
+    if (!plan) {
+      return NextResponse.json(
+        { error: 'Invalid price ID in session metadata' },
+        { status: 400 }
+      )
+    }
+
+    // Idempotency: skip if a trial/grace billing_subscriptions row already exists
+    const { data: existingBillingSub } = await supabaseAdmin
+      .from('billing_subscriptions')
+      .select('id')
+      .eq('user_id', profile.id)
+      .in('billing_phase', ['trial', 'grace'])
+      .maybeSingle()
+
+    if (!existingBillingSub) {
+      const { data: newBillingSub, error: insertError } = await supabaseAdmin
+        .from('billing_subscriptions')
+        .insert({
+          user_id: profile.id,
+          stripe_customer_id: sessionCustomer,
+          outbound_plan_slug: plan.slug,
+          outbound_minutes_included: plan.minutesIncluded,
+          billing_phase: 'trial',
+          trial_calls_required: TRIAL_CALLS_REQUIRED,
+          trial_calls_completed: 0,
+          trial_minutes_ceiling: TRIAL_MINUTES_CEILING,
+        })
+        .select('id')
+        .single()
+
+      if (insertError || !newBillingSub) {
+        console.error('billing_subscriptions insert error:', insertError)
+        return NextResponse.json(
+          { error: 'Failed to create billing subscription record' },
+          { status: 500 }
+        )
+      }
+
+      // Link the new billing_subscriptions row on the user
+      await supabaseAdmin
+        .from('users')
+        .update({ active_billing_subscription_id: newBillingSub.id })
+        .eq('id', profile.id)
+    }
+
+    // Sync billing_phase on users table
+    await supabaseAdmin
       .from('users')
-      .update(updatePayload)
+      .update({
+        billing_phase: 'trial',
+        subscription_plan: plan.slug,
+        subscription_status: 'trialing',
+      })
       .eq('id', profile.id)
 
-    if (updateError) {
-      return NextResponse.json(
-        { error: 'Failed to sync subscription with Supabase' },
-        { status: 500 }
-      )
-    }
-
     return NextResponse.json({
-      subscription: {
-        id: subscription.id,
-        status: updatePayload.subscription_status,
-        plan: updatePayload.subscription_plan,
-        currentPeriodStart: updatePayload.subscription_current_period_start,
-        currentPeriodEnd: updatePayload.subscription_current_period_end,
-        cancelAtPeriodEnd: updatePayload.subscription_cancel_at_period_end,
-      },
+      success: true,
+      billingPhase: 'trial',
+      plan: plan.slug,
+      paymentMethodSaved: true,
     })
   } catch (err) {
-    console.error('Failed to sync subscription from Checkout session', err)
+    console.error('Failed to sync from Checkout session', err)
     return NextResponse.json(
-      { error: 'Unexpected error while syncing subscription' },
+      { error: 'Unexpected error while syncing checkout' },
       { status: 500 }
     )
   }
