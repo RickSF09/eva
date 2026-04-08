@@ -200,8 +200,13 @@ export function SubscriptionManager() {
     refreshUsage()
   }
 
+  // Use the most authoritative billing phase: v2 reads from billing_subscriptions
+  // (source of truth), while billingPhase reads from users table (legacy sync).
+  const effectivePhase: BillingPhase = v2.billingPhase !== 'none' ? v2.billingPhase : billingPhase
+
   // ---- Render: no subscription → show pricing cards -----------------------
-  if (!loading && !hasSubscription && !syncing) {
+  const hasBillingRelationship = hasSubscription || effectivePhase === 'trial' || effectivePhase === 'grace' || effectivePhase === 'active'
+  if (!loading && !usageLoading && !hasBillingRelationship && !syncing) {
     return (
       <div className="space-y-4">
         {errorMessage && (
@@ -230,18 +235,18 @@ export function SubscriptionManager() {
             Manage your DailyFriend subscription and billing details.
           </p>
         </div>
-        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${phaseBadgeStyles(billingPhase)}`}>
-          {loading ? 'Loading...' : formatPhaseLabel(billingPhase)}
+        <span className={`rounded-full border px-3 py-1 text-xs font-medium ${phaseBadgeStyles(effectivePhase)}`}>
+          {loading ? 'Loading...' : formatPhaseLabel(effectivePhase)}
         </span>
       </div>
 
       <div className="mt-6 space-y-6 text-sm text-slate-700">
         {/* Phase-specific banners */}
-        {billingPhase === 'trial' && (
+        {effectivePhase === 'trial' && (
           <TrialProgress subscription={v2.subscription} />
         )}
 
-        {billingPhase === 'grace' && (
+        {effectivePhase === 'grace' && (
           <GracePeriodBanner subscription={v2.subscription} onConfirmPlan={handleUpdate} />
         )}
 
@@ -266,7 +271,7 @@ export function SubscriptionManager() {
         )}
 
         {/* Usage dashboard (active phase) */}
-        {billingPhase === 'active' && !usageLoading && (
+        {effectivePhase === 'active' && !usageLoading && (
           <UsageDashboard
             outbound={v2.outbound}
             inbound={v2.inbound}
@@ -275,21 +280,21 @@ export function SubscriptionManager() {
         )}
 
         {/* Inbound add-on (grace or active) */}
-        {(billingPhase === 'grace' || billingPhase === 'active') && (
+        {(effectivePhase === 'grace' || effectivePhase === 'active') && (
           <div className="border-t border-slate-100 pt-5">
             <InboundAddonSelector subscription={v2.subscription} onUpdate={handleUpdate} />
           </div>
         )}
 
         {/* Overage settings (grace or active) */}
-        {(billingPhase === 'grace' || billingPhase === 'active') && (
+        {(effectivePhase === 'grace' || effectivePhase === 'active') && (
           <div className="border-t border-slate-100 pt-5">
             <OverageSettings subscription={v2.subscription} onUpdate={handleUpdate} />
           </div>
         )}
 
         {/* Next billing date */}
-        {nextBillingDate && billingPhase === 'active' && (
+        {nextBillingDate && effectivePhase === 'active' && (
           <div>
             <p className="text-xs uppercase tracking-wide text-slate-500">Next billing date</p>
             <p className="mt-1 font-medium text-slate-900">{nextBillingDate}</p>
@@ -316,7 +321,7 @@ export function SubscriptionManager() {
 
       {/* Actions */}
       <div className="mt-6 flex flex-wrap gap-3">
-        {billingPhase === 'active' && (
+        {effectivePhase === 'active' && (
           <button
             type="button"
             onClick={handleManageBilling}
