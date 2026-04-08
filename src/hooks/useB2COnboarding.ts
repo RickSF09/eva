@@ -274,8 +274,13 @@ export function useB2COnboardingSnapshot(options: UseB2COnboardingOptions = {}) 
       const subscriptionStatus = profile.subscription_status ?? null
       const billingPhase = profile.billing_phase ?? null
 
-      // Use billing_phase as the primary check; fall back to Stripe status for legacy compat
-      const hasActiveBilling = billingPhase
+      // LEGACY COMPAT: billing_phase='none' is the default for old test users who went through
+      // the original Stripe subscription flow before Billing V2. Treat 'none' the same as null
+      // so these users fall back to the subscription_status check and aren't stuck on onboarding.
+      //
+      // TO REMOVE LATER: Once all pre-V2 test accounts are gone (or migrated), simplify this to:
+      //   const hasActiveBilling = isBillingPhaseActiveForAccess(billingPhase) || isSubscriptionActiveForAccess(subscriptionStatus)
+      const hasActiveBilling = (billingPhase && billingPhase !== 'none')
         ? isBillingPhaseActiveForAccess(billingPhase)
         : isSubscriptionActiveForAccess(subscriptionStatus)
 
