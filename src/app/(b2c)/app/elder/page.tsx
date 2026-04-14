@@ -16,6 +16,7 @@ import {
   validateE164,
   type SupportedCountryCode,
 } from '@/lib/phone'
+import { getBrowserSchedulingTimezone } from '@/lib/scheduling-timezone'
 import { Tables } from '@/types/database'
 import {
   DndContext,
@@ -532,6 +533,16 @@ export default function B2CElderPage() {
     setScheduleError(null)
 
     try {
+      if (profileId) {
+        const timezone = getBrowserSchedulingTimezone()
+        const { error: timezoneError } = await supabase
+          .from('users')
+          .update({ timezone } as any)
+          .eq('id', profileId)
+
+        if (timezoneError) throw timezoneError
+      }
+
       const checklist = scheduleForm.topics
         .map((item) => item.trim())
         .filter(Boolean)

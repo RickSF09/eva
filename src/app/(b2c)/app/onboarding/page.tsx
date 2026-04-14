@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { getBrowserSchedulingTimezone } from '@/lib/scheduling-timezone'
 import { PricingCards } from '@/components/billing/PricingCards'
 import { TRIAL_CALLS_REQUIRED, TRIAL_MINUTES_CEILING, GRACE_PERIOD_DAYS, getPlanBySlug, formatPrice } from '@/config/plans'
 import {
@@ -893,6 +894,16 @@ function ScheduleStep({
     const frequency = form.days.length === 7 ? 'daily' : 'custom'
 
     try {
+      if (snapshot.profileId) {
+        const timezone = getBrowserSchedulingTimezone()
+        const { error: timezoneError } = await supabase
+          .from('users')
+          .update({ timezone } as any)
+          .eq('id', snapshot.profileId)
+
+        if (timezoneError) throw timezoneError
+      }
+
       if (form.id) {
         const { error: updateError } = await supabase
           .from('call_schedules')
