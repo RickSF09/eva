@@ -16,7 +16,6 @@ import {
   validateE164,
   type SupportedCountryCode,
 } from '@/lib/phone'
-import { calculateNextScheduledTime } from '@/lib/utils'
 import { Tables } from '@/types/database'
 import {
   DndContext,
@@ -574,22 +573,12 @@ export default function B2CElderPage() {
           // Don't throw here as the schedule was updated successfully
         }
 
-        // Create new call_execution with updated schedule
-        const nextScheduledTime = calculateNextScheduledTime(scheduleForm.days, times)
-
-        if (consentGranted && nextScheduledTime) {
-          const { error: executionError } = await supabase
-            .from('call_executions')
-            .insert({
-              elder_id: elderId,
-              schedule_id: editingScheduleId,
-              call_type: 'scheduled',
-              status: 'pending',
-              scheduled_for: nextScheduledTime.toISOString(),
-            })
-
-          if (executionError) {
-            console.error('Failed to create call execution:', executionError)
+        if (consentGranted) {
+          const { error: seedError } = await supabase.rpc('seed_pending_scheduled_calls_for_elder', {
+            p_elder_id: elderId,
+          })
+          if (seedError) {
+            console.error('Failed to seed pending scheduled calls:', seedError)
             // Don't throw here as the schedule was updated successfully
           }
         }
@@ -632,22 +621,12 @@ export default function B2CElderPage() {
 
         if (linkError) throw linkError
 
-        // Create call_execution to start the calling sequence
-        const nextScheduledTime = calculateNextScheduledTime(scheduleForm.days, times)
-
-        if (consentGranted && nextScheduledTime) {
-          const { error: executionError } = await supabase
-            .from('call_executions')
-            .insert({
-              elder_id: elderId,
-              schedule_id: schedule.id,
-              call_type: 'scheduled',
-              status: 'pending',
-              scheduled_for: nextScheduledTime.toISOString(),
-            })
-
-          if (executionError) {
-            console.error('Failed to create call execution:', executionError)
+        if (consentGranted) {
+          const { error: seedError } = await supabase.rpc('seed_pending_scheduled_calls_for_elder', {
+            p_elder_id: elderId,
+          })
+          if (seedError) {
+            console.error('Failed to seed pending scheduled calls:', seedError)
             // Don't throw here as the schedule was created successfully
           }
         }

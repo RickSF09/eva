@@ -20,7 +20,7 @@ import {
   User,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { calculateNextScheduledTime, cn } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { PricingCards } from '@/components/billing/PricingCards'
 import { TRIAL_CALLS_REQUIRED, TRIAL_MINUTES_CEILING, GRACE_PERIOD_DAYS, getPlanBySlug, formatPrice } from '@/config/plans'
 import {
@@ -916,15 +916,13 @@ function ScheduleStep({
           .eq('schedule_id', form.id)
           .eq('status', 'pending')
 
-        const nextCall = calculateNextScheduledTime(form.days, times)
-        if (consentGranted && nextCall) {
-          await supabase.from('call_executions').insert({
-            elder_id: elderId,
-            schedule_id: form.id,
-            call_type: 'scheduled',
-            status: 'pending',
-            scheduled_for: nextCall.toISOString(),
+        if (consentGranted) {
+          const { error: seedError } = await supabase.rpc('seed_pending_scheduled_calls_for_elder', {
+            p_elder_id: elderId,
           })
+          if (seedError) {
+            console.error('Failed to seed pending scheduled calls', seedError)
+          }
         }
       } else {
         const { data: schedule, error: insertError } = await supabase
@@ -953,15 +951,13 @@ function ScheduleStep({
           active: true,
         })
 
-        const nextCall = calculateNextScheduledTime(form.days, times)
-        if (consentGranted && nextCall) {
-          await supabase.from('call_executions').insert({
-            elder_id: elderId,
-            schedule_id: schedule.id,
-            call_type: 'scheduled',
-            status: 'pending',
-            scheduled_for: nextCall.toISOString(),
+        if (consentGranted) {
+          const { error: seedError } = await supabase.rpc('seed_pending_scheduled_calls_for_elder', {
+            p_elder_id: elderId,
           })
+          if (seedError) {
+            console.error('Failed to seed pending scheduled calls', seedError)
+          }
         }
       }
 
